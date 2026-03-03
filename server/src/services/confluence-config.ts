@@ -9,10 +9,20 @@ export interface ResolvedConfluenceConfig {
 }
 
 /**
- * Resolve Confluence config with priority: env vars > file config > null.
+ * Resolve Confluence config with priority: file config > env vars > null.
+ * File config takes priority so that UI-saved settings override .env.
  */
 export async function resolveConfluenceConfig(): Promise<ResolvedConfluenceConfig | null> {
-  // Priority 1: env vars (all four must be set)
+  // Priority 1: file config (UI-saved, overrides env)
+  const fileConfig = await loadConfig();
+  if (fileConfig.confluence) {
+    return {
+      config: fileConfig.confluence,
+      source: 'file',
+    };
+  }
+
+  // Priority 2: env vars (all four must be set)
   const { CONFLUENCE_BASE_URL, CONFLUENCE_EMAIL, CONFLUENCE_API_TOKEN, CONFLUENCE_PAGE_ID } = process.env;
   if (CONFLUENCE_BASE_URL && CONFLUENCE_EMAIL && CONFLUENCE_API_TOKEN && CONFLUENCE_PAGE_ID) {
     return {
@@ -23,15 +33,6 @@ export async function resolveConfluenceConfig(): Promise<ResolvedConfluenceConfi
         pageId: CONFLUENCE_PAGE_ID,
       },
       source: 'env',
-    };
-  }
-
-  // Priority 2: file config
-  const fileConfig = await loadConfig();
-  if (fileConfig.confluence) {
-    return {
-      config: fileConfig.confluence,
-      source: 'file',
     };
   }
 

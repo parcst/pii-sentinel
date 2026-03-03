@@ -106,8 +106,8 @@ Express on port 3001 with five route groups:
 - `LiveScanProgress` — Streaming progress spinner + collapsible errors panel (live mode)
 
 **Settings Components (`components/settings/`):**
-- `ConfluenceBanner` — Sidebar callout: shows setup prompt (dismissible via localStorage) when unconfigured, green "linked" indicator when configured, "Edit" button to open modal
-- `ConfluenceSetupModal` — Modal form for Confluence credentials (Base URL, Email, API Token, Page ID). Test Connection button, Save/Cancel/Remove. Read-only when config source is env vars
+- `ConfluenceBanner` — Sidebar status: green "linked" indicator when valid, red warning when connection fails, setup prompt when unconfigured. Validates on page load.
+- `ConfluenceSetupModal` — Modal form for Confluence credentials (Page URL, Email, API Token). Test Connection button, Save/Cancel/Remove. Always editable regardless of config source. Shown as scan gate when unconfigured or when validation fails.
 
 ### Key Types
 
@@ -160,8 +160,8 @@ Live database scanning via Teleport tunnels. Requires `tsh` binary (Teleport CLI
 Optional live override integration with Confluence PII reference page. When configured, the scan fetches the Confluence page and merges its entries with static overrides.
 
 **Setup (two options):**
-1. **UI (recommended):** Click "Set Up" in the sidebar Confluence banner, fill in credentials, test, and save. Config is persisted to `server/data/config.json`.
-2. **Env vars:** Copy `server/.env.example` to `server/.env` and fill in credentials (takes priority over file config):
+1. **UI (recommended):** Click "Edit" on the Confluence banner (or triggered on first scan), enter page URL + email + API token, test, and save. Config is persisted to `server/data/config.json`. UI-saved config overrides `.env` values.
+2. **Env vars (fallback):** Copy `server/.env.example` to `server/.env` and fill in credentials. Only used if no UI-saved config exists:
 ```
 CONFLUENCE_BASE_URL=https://your-org.atlassian.net
 CONFLUENCE_EMAIL=your-email@company.com
@@ -169,7 +169,7 @@ CONFLUENCE_API_TOKEN=your-api-token
 CONFLUENCE_PAGE_ID=123456789
 ```
 
-**Config resolution priority:** env vars (all 4 set) > file config (`server/data/config.json`) > null (scan without Confluence)
+**Config resolution priority:** file config (`server/data/config.json`) > env vars (all 4 set) > null (scan without Confluence)
 
 **How it works:**
 - At scan time, `resolveConfluenceConfig()` determines which config source to use

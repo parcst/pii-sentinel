@@ -23,11 +23,10 @@ export default function ConfluenceSetupModal({ onSaved }: Props) {
   const confluenceValidationError = useScanStore((s) => s.confluenceValidationError);
   const setConfluenceValidationError = useScanStore((s) => s.setConfluenceValidationError);
 
-  const isEnv = confluenceStatus?.source === 'env';
-  const isFileConfigured = confluenceStatus?.configured && confluenceStatus.source === 'file';
+  const isConfigured = !!confluenceStatus?.configured;
   const hasPendingScan = !!pendingScanAction;
-  const isGateMode = hasPendingScan && !confluenceStatus?.configured;
-  const isValidationFailedMode = hasPendingScan && !!confluenceStatus?.configured;
+  const isGateMode = hasPendingScan && !isConfigured;
+  const isValidationFailedMode = hasPendingScan && isConfigured;
 
   const [pageUrl, setPageUrl] = useState('');
   const [email, setEmail] = useState('');
@@ -39,9 +38,9 @@ export default function ConfluenceSetupModal({ onSaved }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (open && confluenceStatus?.configured) {
-      setPageUrl(confluenceStatus.pageUrl ?? '');
-      setEmail(confluenceStatus.email ?? '');
+    if (open && isConfigured) {
+      setPageUrl(confluenceStatus?.pageUrl ?? '');
+      setEmail(confluenceStatus?.email ?? '');
       setApiToken('');
     } else if (open) {
       setPageUrl('');
@@ -177,41 +176,32 @@ export default function ConfluenceSetupModal({ onSaved }: Props) {
             </div>
           )}
 
-          {isEnv && (
-            <div className="rounded bg-amber-950/40 border border-amber-800/40 px-3 py-2 text-xs text-amber-200/90">
-              Confluence is configured via environment variables. Edit your <code className="bg-gray-800 px-1 rounded">.env</code> file to change these settings.
-            </div>
-          )}
-
           {/* API token instructions */}
-          {!isEnv && (
-            <details className="group" open={isGateMode}>
-              <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-300 select-none transition-colors">
-                How to get an Atlassian API token
-              </summary>
-              <div className="mt-2 rounded bg-gray-800/60 border border-gray-700/50 px-3 py-2.5 text-xs text-gray-400 space-y-1.5">
-                <ol className="list-decimal list-inside space-y-1">
-                  <li>Go to <span className="text-blue-400">https://id.atlassian.com/manage-profile/security/api-tokens</span></li>
-                  <li>Click <strong className="text-gray-300">Create API token</strong></li>
-                  <li>Give it a label (e.g. "PII Sentinel") and click <strong className="text-gray-300">Create</strong></li>
-                  <li>Copy the token and paste it below</li>
-                </ol>
-              </div>
-            </details>
-          )}
+          <details className="group" open={isGateMode}>
+            <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-300 select-none transition-colors">
+              How to get an Atlassian API token
+            </summary>
+            <div className="mt-2 rounded bg-gray-800/60 border border-gray-700/50 px-3 py-2.5 text-xs text-gray-400 space-y-1.5">
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Go to <span className="text-blue-400">https://id.atlassian.com/manage-profile/security/api-tokens</span></li>
+                <li>Click <strong className="text-gray-300">Create API token</strong></li>
+                <li>Give it a label (e.g. "PII Sentinel") and click <strong className="text-gray-300">Create</strong></li>
+                <li>Copy the token and paste it below</li>
+              </ol>
+            </div>
+          </details>
 
           <div className="space-y-3">
             <label className="block">
               <span className="text-xs text-gray-400 mb-1 block">Confluence Page URL</span>
               <input
                 type="url"
-                value={isEnv ? (confluenceStatus?.pageUrl ?? '') : pageUrl}
+                value={pageUrl}
                 onChange={(e) => setPageUrl(e.target.value)}
-                disabled={isEnv}
                 placeholder="https://your-org.atlassian.net/wiki/spaces/SPACE/pages/123456789/Page+Title"
-                className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500"
               />
-              {pageUrl.trim() && !isEnv && !urlValid && (
+              {pageUrl.trim() && !urlValid && (
                 <p className="text-xs text-red-400 mt-1">Could not find a page ID in this URL. Paste the full Confluence page URL.</p>
               )}
             </label>
@@ -220,11 +210,10 @@ export default function ConfluenceSetupModal({ onSaved }: Props) {
               <span className="text-xs text-gray-400 mb-1 block">Email</span>
               <input
                 type="email"
-                value={isEnv ? (confluenceStatus?.email ?? '') : email}
+                value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled={isEnv}
                 placeholder="your-email@company.com"
-                className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500"
               />
             </label>
 
@@ -232,11 +221,10 @@ export default function ConfluenceSetupModal({ onSaved }: Props) {
               <span className="text-xs text-gray-400 mb-1 block">API Token</span>
               <input
                 type="password"
-                value={isEnv ? '********' : apiToken}
+                value={apiToken}
                 onChange={(e) => setApiToken(e.target.value)}
-                disabled={isEnv}
-                placeholder="Atlassian API token"
-                className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                placeholder={isConfigured ? 'Re-enter token to save changes' : 'Atlassian API token'}
+                className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500"
               />
             </label>
           </div>
@@ -259,7 +247,7 @@ export default function ConfluenceSetupModal({ onSaved }: Props) {
         {/* Footer */}
         <div className="flex items-center justify-between px-5 py-4 border-t border-gray-800">
           <div>
-            {isFileConfigured && !hasPendingScan && (
+            {isConfigured && !hasPendingScan && (
               <button
                 onClick={handleRemove}
                 disabled={saving}
@@ -278,30 +266,26 @@ export default function ConfluenceSetupModal({ onSaved }: Props) {
             )}
           </div>
           <div className="flex items-center gap-2">
-            {!isEnv && (
-              <button
-                onClick={handleTest}
-                disabled={!formValid || testing}
-                className="px-3 py-1.5 text-xs text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {testing ? 'Testing...' : 'Test Connection'}
-              </button>
-            )}
+            <button
+              onClick={handleTest}
+              disabled={!formValid || testing}
+              className="px-3 py-1.5 text-xs text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {testing ? 'Testing...' : 'Test Connection'}
+            </button>
             <button
               onClick={handleClose}
               className="px-3 py-1.5 text-sm text-gray-400 hover:text-gray-200 transition-colors"
             >
               Cancel
             </button>
-            {!isEnv && (
-              <button
-                onClick={handleSave}
-                disabled={!formValid || saving}
-                className="px-4 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors"
-              >
-                {saving ? 'Saving...' : hasPendingScan ? 'Save & Scan' : 'Save'}
-              </button>
-            )}
+            <button
+              onClick={handleSave}
+              disabled={!formValid || saving}
+              className="px-4 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded transition-colors"
+            >
+              {saving ? 'Saving...' : hasPendingScan ? 'Save & Scan' : 'Save'}
+            </button>
           </div>
         </div>
       </div>

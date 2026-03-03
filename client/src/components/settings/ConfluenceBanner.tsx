@@ -15,7 +15,7 @@ export default function ConfluenceBanner() {
         <div className="flex items-center gap-2 min-w-0">
           <span className="h-2 w-2 rounded-full bg-emerald-400 shrink-0" />
           <span className="text-xs text-gray-300 truncate">
-            Confluence linked{confluenceStatus.source === 'env' ? ' (via .env)' : ''}
+            Confluence linked
           </span>
         </div>
         <button
