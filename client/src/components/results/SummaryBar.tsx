@@ -3,9 +3,10 @@ import ConfidenceBadge from './ConfidenceBadge';
 
 interface Props {
   summary: ScanSummary;
+  excludedCount?: number;
 }
 
-export default function SummaryBar({ summary }: Props) {
+export default function SummaryBar({ summary, excludedCount }: Props) {
   return (
     <div className="flex flex-wrap items-center gap-4 px-6 py-3 bg-gray-900 border-b border-gray-800">
       <div className="text-sm text-gray-400">
@@ -16,6 +17,9 @@ export default function SummaryBar({ summary }: Props) {
       </div>
       <div className="text-sm text-gray-400">
         <span className="text-gray-200 font-medium">{summary.totalPiiColumns.toLocaleString()}</span> PII columns
+        {excludedCount != null && excludedCount > 0 && (
+          <span className="text-gray-500"> ({excludedCount} excluded)</span>
+        )}
       </div>
       <div className="text-sm text-gray-500">
         {summary.scanDurationMs.toLocaleString()}ms

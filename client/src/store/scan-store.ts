@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ScanResponse, ScanSummary, DatabaseResult, ConfidenceTier, PiiCategory, ScanMode, TeleportInstance, TeleportStatus, ConfluenceStatus } from '../api/types';
+import type { ScanResponse, ScanSummary, DatabaseResult, ConfidenceTier, PiiCategory, ScanMode, TeleportInstance, TeleportStatus, ConfluenceStatus, ExclusionEntry } from '../api/types';
 
 interface ScanStore {
   // Scan mode
@@ -40,9 +40,25 @@ interface ScanStore {
   confluenceValidationError: string | null;
   confluenceValid: boolean | null; // null = not checked, true = working, false = broken
 
+  // Exclusions
+  exclusions: ExclusionEntry[];
+  osUsername: string;
+  showExcluded: boolean;
+  toastQueue: Array<{ id: string; entry: ExclusionEntry }>;
+
   // UI state
   expandedDatabases: Set<string>;
   expandedTables: Set<string>;
+
+  // Exclusion actions
+  setExclusions: (exclusions: ExclusionEntry[]) => void;
+  setOsUsername: (username: string) => void;
+  toggleShowExcluded: () => void;
+  addExclusionLocal: (entry: ExclusionEntry) => void;
+  removeExclusionLocal: (entry: ExclusionEntry) => void;
+  clearAllExclusionsLocal: () => void;
+  pushToast: (item: { id: string; entry: ExclusionEntry }) => void;
+  clearToast: () => void;
 
   // Confluence actions
   setConfluenceStatus: (status: ConfluenceStatus | null) => void;
@@ -110,6 +126,12 @@ export const useScanStore = create<ScanStore>((set, get) => ({
   selectedDatabases: new Set<string>(),
   discoveringDatabases: false,
 
+  // Exclusions
+  exclusions: [],
+  osUsername: '',
+  showExcluded: false,
+  toastQueue: [],
+
   // Confluence setup
   confluenceStatus: null,
   confluenceSetupOpen: false,
@@ -131,6 +153,21 @@ export const useScanStore = create<ScanStore>((set, get) => ({
   // UI state
   expandedDatabases: new Set<string>(),
   expandedTables: new Set<string>(),
+
+  // Exclusion actions
+  setExclusions: (exclusions) => set({ exclusions }),
+  setOsUsername: (username) => set({ osUsername: username }),
+  toggleShowExcluded: () => set({ showExcluded: !get().showExcluded }),
+  addExclusionLocal: (entry) => set({ exclusions: [...get().exclusions, entry] }),
+  removeExclusionLocal: (entry) =>
+    set({
+      exclusions: get().exclusions.filter(
+        (e) => !(e.table === entry.table && e.column === entry.column && e.scope === entry.scope)
+      ),
+    }),
+  clearAllExclusionsLocal: () => set({ exclusions: [], showExcluded: false }),
+  pushToast: (item) => set({ toastQueue: [...get().toastQueue, item] }),
+  clearToast: () => set({ toastQueue: [] }),
 
   // Confluence actions
   setConfluenceStatus: (status) => set({ confluenceStatus: status }),

@@ -99,6 +99,21 @@ export type LiveScanEvent =
   | { type: 'error'; message: string; database?: string }
   | { type: 'done'; summary: ScanSummary; confluenceActive: boolean };
 
+// ===== Exclusion Types =====
+
+export interface ExclusionEntry {
+  table: string;
+  column: string;
+  scope: 'global' | string;
+  excludedBy: string;
+  excludedAt: string;
+}
+
+export interface ExclusionsResponse {
+  exclusions: ExclusionEntry[];
+  username: string;
+}
+
 // ===== Settings Types =====
 
 export interface ConfluenceStatus {

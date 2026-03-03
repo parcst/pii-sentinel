@@ -1,4 +1,4 @@
-import type { BrowseResponse, ValidatePathResponse, ScanResponse, DatabaseResult, TeleportInstance, TeleportStatus, ConfluenceStatus, ConfluenceTestResult } from './types';
+import type { BrowseResponse, ValidatePathResponse, ScanResponse, DatabaseResult, TeleportInstance, TeleportStatus, ConfluenceStatus, ConfluenceTestResult, ExclusionsResponse } from './types';
 
 async function post<T>(url: string, body: Record<string, unknown>): Promise<T> {
   const res = await fetch(url, {
@@ -37,6 +37,19 @@ async function put<T>(url: string, body: Record<string, unknown>): Promise<T> {
 
 async function del<T>(url: string): Promise<T> {
   const res = await fetch(url, { method: 'DELETE' });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `Request failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+async function delWithBody<T>(url: string, body: Record<string, unknown>): Promise<T> {
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error || `Request failed: ${res.status}`);
@@ -153,4 +166,22 @@ export function testConfluenceConnection(config: { baseUrl: string; email: strin
 
 export function validateConfluenceConnection(): Promise<ConfluenceTestResult & { source?: string }> {
   return post('/api/settings/confluence/validate', {});
+}
+
+// ===== Exclusions API =====
+
+export function getExclusions(): Promise<ExclusionsResponse> {
+  return get('/api/exclusions');
+}
+
+export function addExclusion(entry: { table: string; column: string; scope: string }): Promise<{ success: boolean }> {
+  return post('/api/exclusions', entry);
+}
+
+export function removeExclusion(entry: { table: string; column: string; scope: string }): Promise<{ success: boolean }> {
+  return delWithBody('/api/exclusions', entry);
+}
+
+export function clearAllExclusions(): Promise<{ success: boolean }> {
+  return del('/api/exclusions/all');
 }

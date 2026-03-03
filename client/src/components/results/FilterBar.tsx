@@ -1,5 +1,8 @@
+import { useState } from 'react';
 import { useScanStore } from '../../store/scan-store';
+import { useExclusions } from '../../hooks/useExclusions';
 import type { ConfidenceTier, PiiCategory } from '../../api/types';
+import ClearExclusionsDialog from './ClearExclusionsDialog';
 
 const TIERS: ConfidenceTier[] = ['critical', 'high', 'medium', 'low'];
 const CATEGORIES: PiiCategory[] = [
@@ -27,7 +30,13 @@ export default function FilterBar() {
     toggleExcludeConfluence,
     expandAll,
     collapseAll,
+    exclusions,
+    showExcluded,
+    toggleShowExcluded,
   } = useScanStore();
+
+  const { clearAll } = useExclusions();
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
 
   if (!results) return null;
 
@@ -110,6 +119,29 @@ export default function FilterBar() {
         </div>
       )}
 
+      {/* Exclusions controls */}
+      {exclusions.length > 0 && (
+        <div className="space-y-1.5">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showExcluded}
+              onChange={toggleShowExcluded}
+              className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+            />
+            <span className="text-[11px] text-gray-400">
+              Show excluded ({exclusions.length})
+            </span>
+          </label>
+          <button
+            onClick={() => setClearDialogOpen(true)}
+            className="text-[11px] text-red-400/70 hover:text-red-300 transition-colors"
+          >
+            Clear all exclusions
+          </button>
+        </div>
+      )}
+
       {/* Expand/Collapse */}
       <div className="flex gap-2">
         <button
@@ -125,6 +157,17 @@ export default function FilterBar() {
           Collapse all
         </button>
       </div>
+
+      {clearDialogOpen && (
+        <ClearExclusionsDialog
+          count={exclusions.length}
+          onConfirm={() => {
+            clearAll();
+            setClearDialogOpen(false);
+          }}
+          onCancel={() => setClearDialogOpen(false)}
+        />
+      )}
     </div>
   );
 }

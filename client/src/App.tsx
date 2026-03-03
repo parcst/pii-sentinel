@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import Header from './components/layout/Header';
 import FolderInput from './components/scan/FolderInput';
 import ScanButton from './components/scan/ScanButton';
@@ -11,14 +12,38 @@ import SummaryBar from './components/results/SummaryBar';
 import ResultsTree from './components/results/ResultsTree';
 import ConfluenceBanner from './components/settings/ConfluenceBanner';
 import ConfluenceSetupModal from './components/settings/ConfluenceSetupModal';
+import ExclusionToast from './components/ui/ExclusionToast';
 import { useScan } from './hooks/useScan';
 import { useConfluenceStatus } from './hooks/useConfluenceStatus';
+import { useExclusionsLoader } from './hooks/useExclusions';
 import { useScanStore } from './store/scan-store';
 
 export default function App() {
   const { scanPath, setScanPath, runScan, loading } = useScan();
   const { refresh: refreshConfluence } = useConfluenceStatus();
-  const { results, error, scanMode } = useScanStore();
+  useExclusionsLoader();
+  const { results, error, scanMode, exclusions } = useScanStore();
+
+  const excludedCount = useMemo(() => {
+    if (!results || exclusions.length === 0) return 0;
+    let count = 0;
+    for (const db of results.databases) {
+      for (const table of db.tables) {
+        for (const col of table.piiColumns) {
+          // Confluence columns are never excluded
+          if (col.matches.some(m => m.matchedOn === 'confluence')) continue;
+          const isExcluded = exclusions.some(
+            (e) =>
+              e.table === table.tableName &&
+              e.column === col.columnName &&
+              (e.scope === 'global' || e.scope === db.displayPath)
+          );
+          if (isExcluded) count++;
+        }
+      }
+    }
+    return count;
+  }, [results, exclusions]);
 
   return (
     <div className="h-screen flex flex-col bg-gray-950 text-gray-100">
@@ -51,12 +76,13 @@ export default function App() {
 
         {/* Main content */}
         <main className="flex-1 flex flex-col overflow-hidden">
-          {results && <SummaryBar summary={results.summary} />}
+          {results && <SummaryBar summary={results.summary} excludedCount={excludedCount} />}
           <ResultsTree />
         </main>
       </div>
 
       <ConfluenceSetupModal onSaved={refreshConfluence} />
+      <ExclusionToast />
     </div>
   );
 }

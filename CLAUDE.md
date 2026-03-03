@@ -44,7 +44,7 @@ Both modes produce identical `DatabaseResult[]` output, so the results tree, fil
 
 ### Server (`server/src/`)
 
-Express on port 3001 with five route groups:
+Express on port 3001 with six route groups:
 
 | Route | Purpose |
 |-------|---------|
@@ -66,6 +66,10 @@ Express on port 3001 with five route groups:
 | `DELETE /api/settings/confluence` | Remove file-based Confluence config |
 | `POST /api/settings/confluence/test` | Test Confluence connection with provided credentials, return override count |
 | `POST /api/settings/confluence/validate` | Test the currently resolved config (env or file), return override count |
+| `GET /api/exclusions` | List all manual exclusions + OS username |
+| `POST /api/exclusions` | Add one exclusion (deduplicates by table+column+scope) |
+| `DELETE /api/exclusions` | Remove one exclusion by table+column+scope in body |
+| `DELETE /api/exclusions/all` | Clear all exclusions |
 
 **Service pipeline:** Scanner -> Parser -> PII Detector -> Exporter
 
@@ -85,6 +89,8 @@ Express on port 3001 with five route groups:
 
 - **Confluence Config Resolution** (`services/confluence-config.ts`) - Single source of truth for Confluence credentials. `resolveConfluenceConfig()` returns config with priority: env vars (all 4 set) > file config (`data/config.json`) > null. Used by both scan routes and live scanner.
 
+- **Exclusion Store** (`services/exclusion-store.ts`) - Reads/writes `server/data/exclusions.json` as a flat array of `ExclusionEntry` objects. Mirrors `config-store.ts` pattern. Each entry has `table`, `column`, `scope` ('global' or displayPath), `excludedBy` (OS username), and `excludedAt` (ISO timestamp). Fail-soft: returns `[]` on read error.
+
 - **Exporter** (`services/exporter.ts`) - Flattens scan results tree into CSV rows.
 
 - **Teleport** (`services/teleport.ts`) - Manages Teleport CLI (`tsh`) integration. Ported from `rds-capacity-heatmap` Python project. Functions: `findTsh()` (PATH + macOS app bundle), `getClusters()` (reads `~/.tsh/*.yaml`), `getLoginStatus()` (parses `tsh status --format=json`, checks both active and profiles), `loginToCluster()` (spawns SSO login), `listMysqlInstances()` (filters `tsh db ls` for MySQL protocol), `startTunnel()` (3-step: db login + proxy db + parse port), `stopTunnel()` (terminate + db logout). Includes tunnel registry (`registerTunnel`/`unregisterTunnel`) and `cleanupAll()` for killing all active tunnels on shutdown.
@@ -93,7 +99,7 @@ Express on port 3001 with five route groups:
 
 ### Client (`client/src/`)
 
-- **State** - Single Zustand store (`store/scan-store.ts`) holds scan mode, scan path, results, filters, Teleport state (clusters, login status, instances, database selection), and streaming state (progress, errors).
+- **State** - Single Zustand store (`store/scan-store.ts`) holds scan mode, scan path, results, filters, Teleport state (clusters, login status, instances, database selection), streaming state (progress, errors), and exclusion state (exclusions array, OS username, showExcluded toggle, toast queue).
 - **API client** (`api/client.ts`) - Typed fetch wrappers for all server endpoints including Teleport API functions.
 - **Layout** - Dark theme. Left sidebar (w-80): scan mode toggle, then either directory controls (folder input, scan button, progress) or Teleport controls (cluster/login/instance/database picker/scan). Shared: filter bar, export button. Right main area: summary bar + results tree.
 - **Results tree** - Three-level hierarchy: database groups -> table groups -> column rows with confidence badges. Identical for both scan modes.
@@ -102,6 +108,8 @@ Express on port 3001 with five route groups:
 - `useScan` — Directory scan lifecycle (path, loading, error, results)
 - `useTeleport` — Teleport lifecycle: cluster loading, login polling (2s interval), instance loading, database discovery, SSE scan (EventSource open/message/error/close), cancel. Sends `sendBeacon` to `/api/teleport/shutdown` on `beforeunload` for auto-cleanup on page close.
 - `useConfluenceStatus` — Fetches Confluence config status on mount, provides `refresh()` for re-fetching after save/remove
+- `useExclusionsLoader` — Loads exclusions from server on mount (called once in App.tsx)
+- `useExclusions` — Returns `{ exclude, include, clearAll }` action functions with optimistic updates + server sync + rollback on error
 
 **Scan Components (`components/scan/`):**
 - `ScanModeToggle` — Radio-style button group (Directory / Live Database), disables Live if tsh unavailable
@@ -116,6 +124,27 @@ Express on port 3001 with five route groups:
 **Settings Components (`components/settings/`):**
 - `ConfluenceBanner` — Sidebar status: green "linked" indicator when valid, red warning when connection fails, setup prompt when unconfigured. Validates on page load.
 - `ConfluenceSetupModal` — Modal form for Confluence credentials (Page URL, Email, API Token). Test Connection button, Save/Cancel/Remove. Always editable regardless of config source. Shown as scan gate when unconfigured or when validation fails.
+
+**Results Components (`components/results/`):**
+- `ExcludeScopePopover` — Inline absolute-positioned popover for choosing exclusion scope (global vs database-scoped). Anchored to Exclude button, dismisses on click-outside.
+- `ClearExclusionsDialog` — Confirmation modal for clearing all exclusions.
+
+**UI Components (`components/ui/`):**
+- `ExclusionToast` — Fixed bottom-center toast showing exclusion count with Undo button. 5-second auto-dismiss, timer resets on each new exclusion. Undo reverses all items in current batch.
+
+### Manual Exclusions
+
+Users can manually exclude false-positive PII columns from scan results. Exclusions persist across scans and server restarts via `server/data/exclusions.json`.
+
+**Key behaviors:**
+- Confluence-matched columns (`matchedOn === 'confluence'`) are never excludable — no Exclude button shown, exclusion filter skips them
+- Exclusion scope: "global" (all databases) or database-scoped (specific displayPath)
+- Client-side filtering: server returns full scan results, client applies exclusion filter in `matchesFilters()`
+- Optimistic updates: local store updates immediately, server sync async with rollback on error
+- Toast stacking: single toast with incrementing count, 5-second auto-dismiss, Undo reverses all queued items
+- FilterBar shows "Show excluded (N)" checkbox and "Clear all exclusions" link when exclusions exist
+- SummaryBar shows "(N excluded)" annotation when applicable
+- Excluded rows render with `opacity-40`, strikethrough on column name, and "excluded by [user]" label
 
 ### Key Types
 
@@ -133,6 +162,7 @@ Express on port 3001 with five route groups:
 - `TeleportInstance`: RDS instance metadata from `tsh db ls` (name, uri, accountId, region, instanceId)
 - `TeleportStatus`: Login state with loggedIn flag, username, cluster
 - `LiveScanEvent`: Union type for SSE events — `progress`, `database_result`, `error`, `done`
+- `ExclusionEntry`: `{ table, column, scope, excludedBy, excludedAt }` — manual exclusion record
 
 Server types in `server/src/types.ts`. Client mirrors in `client/src/api/types.ts`.
 

@@ -1,13 +1,27 @@
-import type { TableResult } from '../../api/types';
+import type { TableResult, ExclusionEntry } from '../../api/types';
 import ColumnRow from './ColumnRow';
 
 interface Props {
   table: TableResult;
+  displayPath: string;
+  dbLabel: string;
   expanded: boolean;
   onToggle: () => void;
+  exclusions: ExclusionEntry[];
+  onExclude: (table: string, column: string, scope: string) => void;
+  onInclude: (entry: ExclusionEntry) => void;
 }
 
-export default function TableGroup({ table, expanded, onToggle }: Props) {
+export default function TableGroup({ table, displayPath, dbLabel, expanded, onToggle, exclusions, onExclude, onInclude }: Props) {
+  function getExclusionFor(columnName: string): ExclusionEntry | undefined {
+    return exclusions.find(
+      (e) =>
+        e.table === table.tableName &&
+        e.column === columnName &&
+        (e.scope === 'global' || e.scope === displayPath)
+    );
+  }
+
   return (
     <div>
       <button
@@ -33,11 +47,25 @@ export default function TableGroup({ table, expanded, onToggle }: Props) {
             <span className="text-[10px] font-medium text-gray-600 uppercase tracking-wider min-w-[120px]">Data Type</span>
             <span className="text-[10px] font-medium text-gray-600 uppercase tracking-wider min-w-[90px]">Category</span>
             <span className="text-[10px] font-medium text-gray-600 uppercase tracking-wider w-[70px] text-center">Confluence</span>
-            <span className="text-[10px] font-medium text-gray-600 uppercase tracking-wider ml-auto">Match</span>
+            <span className="text-[10px] font-medium text-gray-600 uppercase tracking-wider">Match</span>
+            <span className="text-[10px] font-medium text-gray-600 uppercase tracking-wider ml-auto">Actions</span>
           </div>
-          {table.piiColumns.map((col) => (
-            <ColumnRow key={col.columnName} column={col} />
-          ))}
+          {table.piiColumns.map((col) => {
+            const exclusion = getExclusionFor(col.columnName);
+            return (
+              <ColumnRow
+                key={col.columnName}
+                column={col}
+                tableName={table.tableName}
+                displayPath={displayPath}
+                dbLabel={dbLabel}
+                isExcluded={!!exclusion}
+                excludedBy={exclusion?.excludedBy ?? null}
+                onExclude={onExclude}
+                onInclude={() => exclusion && onInclude(exclusion)}
+              />
+            );
+          })}
         </div>
       )}
     </div>
