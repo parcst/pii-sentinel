@@ -3,6 +3,13 @@ import { useScanStore } from '../../store/scan-store';
 import { saveConfluenceConfig, removeConfluenceConfig, testConfluenceConnection, parseConfluenceUrl } from '../../api/client';
 import type { ConfluenceTestResult } from '../../api/types';
 
+/** After saving new config, mark it as valid so scan gates pass immediately. */
+function markConfluenceValid() {
+  const s = useScanStore.getState();
+  s.setConfluenceValid(true);
+  s.setConfluenceValidationError(null);
+}
+
 interface Props {
   onSaved: () => void;
 }
@@ -85,6 +92,7 @@ export default function ConfluenceSetupModal({ onSaved }: Props) {
     setError(null);
     try {
       await saveConfluenceConfig(config);
+      markConfluenceValid();
       onSaved();
       const action = useScanStore.getState().pendingScanAction;
       if (action) {
@@ -113,6 +121,7 @@ export default function ConfluenceSetupModal({ onSaved }: Props) {
     setError(null);
     try {
       await removeConfluenceConfig();
+      useScanStore.getState().setConfluenceValid(null);
       onSaved();
       setOpen(false);
     } catch (err: any) {

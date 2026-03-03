@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { scan, validateConfluenceConnection } from '../api/client';
+import { scan } from '../api/client';
 import { useScanStore } from '../store/scan-store';
 
 export function useScan() {
@@ -20,31 +20,19 @@ export function useScan() {
     }
   }, [setLoading, setError, setResults]);
 
-  const runScan = useCallback(async () => {
+  const runScan = useCallback(() => {
     if (!scanPath || loading) return;
-    const { confluenceStatus, setConfluenceSetupOpen, setPendingScanAction, setConfluenceValidationError } = useScanStore.getState();
+    const { confluenceValid, setConfluenceSetupOpen, setPendingScanAction } = useScanStore.getState();
 
-    // Not configured — show setup modal
-    if (!confluenceStatus?.configured) {
-      setPendingScanAction(doScan);
-      setConfluenceSetupOpen(true);
+    // Already validated on mount — scan directly
+    if (confluenceValid === true) {
+      doScan();
       return;
     }
 
-    // Configured — validate the connection first
-    try {
-      const result = await validateConfluenceConnection();
-      if (!result.success) {
-        setConfluenceValidationError(result.error ?? 'Connection failed');
-        setPendingScanAction(doScan);
-        setConfluenceSetupOpen(true);
-        return;
-      }
-    } catch {
-      // Validation request itself failed — let scan proceed, server handles gracefully
-    }
-
-    doScan();
+    // Not configured or broken — show modal with pending scan
+    setPendingScanAction(doScan);
+    setConfluenceSetupOpen(true);
   }, [scanPath, loading, doScan]);
 
   return { scanPath, setScanPath, runScan, loading };

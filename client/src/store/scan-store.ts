@@ -38,6 +38,7 @@ interface ScanStore {
   confluenceSetupOpen: boolean;
   pendingScanAction: (() => void) | null;
   confluenceValidationError: string | null;
+  confluenceValid: boolean | null; // null = not checked, true = working, false = broken
 
   // UI state
   expandedDatabases: Set<string>;
@@ -48,6 +49,7 @@ interface ScanStore {
   setConfluenceSetupOpen: (open: boolean) => void;
   setPendingScanAction: (action: (() => void) | null) => void;
   setConfluenceValidationError: (error: string | null) => void;
+  setConfluenceValid: (valid: boolean | null) => void;
 
   // Actions
   setScanMode: (mode: ScanMode) => void;
@@ -113,6 +115,7 @@ export const useScanStore = create<ScanStore>((set, get) => ({
   confluenceSetupOpen: false,
   pendingScanAction: null,
   confluenceValidationError: null,
+  confluenceValid: null,
 
   // Streaming state
   streamingProgress: '',
@@ -134,6 +137,7 @@ export const useScanStore = create<ScanStore>((set, get) => ({
   setConfluenceSetupOpen: (open) => set({ confluenceSetupOpen: open }),
   setPendingScanAction: (action) => set({ pendingScanAction: action }),
   setConfluenceValidationError: (error) => set({ confluenceValidationError: error }),
+  setConfluenceValid: (valid) => set({ confluenceValid: valid }),
 
   // Actions
   setScanMode: (mode) => set({ scanMode: mode }),
