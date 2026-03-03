@@ -2,10 +2,18 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Quick Start
+
+```bash
+npm install && npm run dev
+```
+
+This installs dependencies, starts both the server (port 3001) and client (port 5173), and opens the app in your browser.
+
 ## Commands
 
 ```bash
-# Development (starts both server and client concurrently)
+# Development (starts both server and client, opens browser)
 npm run dev
 
 # Server only (port 3001, tsx watch mode, loads server/.env)
