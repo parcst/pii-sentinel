@@ -1,7 +1,6 @@
 import mysql from 'mysql2/promise';
 import {
   ConfidenceTier,
-  ConfluenceConfig,
   DatabaseResult,
   LiveScanEvent,
   LocationInfo,
@@ -16,6 +15,7 @@ import { parseCreateTable } from './parser.js';
 import { analyzeTable } from './pii-detector.js';
 import { TABLE_COLUMN_OVERRIDES, mergeOverrides } from './pii-overrides.js';
 import { loadConfluenceOverrides } from './confluence-overrides.js';
+import { resolveConfluenceConfig } from './confluence-config.js';
 
 const SYSTEM_SCHEMAS = new Set([
   'information_schema',
@@ -62,15 +62,9 @@ export async function* liveScan(options: LiveScanOptions): AsyncGenerator<LiveSc
     let confluenceActive = false;
     let overrideMap: Map<string, TableColumnOverride[]> | undefined;
 
-    const { CONFLUENCE_BASE_URL, CONFLUENCE_EMAIL, CONFLUENCE_API_TOKEN, CONFLUENCE_PAGE_ID } = process.env;
-    if (CONFLUENCE_BASE_URL && CONFLUENCE_EMAIL && CONFLUENCE_API_TOKEN && CONFLUENCE_PAGE_ID) {
-      const config: ConfluenceConfig = {
-        baseUrl: CONFLUENCE_BASE_URL,
-        email: CONFLUENCE_EMAIL,
-        apiToken: CONFLUENCE_API_TOKEN,
-        pageId: CONFLUENCE_PAGE_ID,
-      };
-      const confluenceOverrides = await loadConfluenceOverrides(config);
+    const resolved = await resolveConfluenceConfig();
+    if (resolved) {
+      const confluenceOverrides = await loadConfluenceOverrides(resolved.config);
       overrideMap = mergeOverrides(TABLE_COLUMN_OVERRIDES, confluenceOverrides);
       confluenceActive = confluenceOverrides.length > 0;
     }

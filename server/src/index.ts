@@ -4,6 +4,7 @@ import filesystemRouter from './routes/filesystem.js';
 import scanRouter from './routes/scan.js';
 import exportRouter from './routes/export.js';
 import teleportRouter from './routes/teleport.js';
+import settingsRouter from './routes/settings.js';
 import { cleanupAll } from './services/teleport.js';
 
 const app = express();
@@ -16,6 +17,7 @@ app.use('/api', filesystemRouter);
 app.use('/api/scan', scanRouter);
 app.use('/api/export', exportRouter);
 app.use('/api/teleport', teleportRouter);
+app.use('/api/settings', settingsRouter);
 
 app.listen(PORT, () => {
   console.log(`PII Sentinel server running on http://localhost:${PORT}`);

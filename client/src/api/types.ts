@@ -98,3 +98,18 @@ export type LiveScanEvent =
   | { type: 'database_result'; database: DatabaseResult; partialSummary: ScanSummary }
   | { type: 'error'; message: string; database?: string }
   | { type: 'done'; summary: ScanSummary; confluenceActive: boolean };
+
+// ===== Settings Types =====
+
+export interface ConfluenceStatus {
+  configured: boolean;
+  source?: 'env' | 'file';
+  pageUrl?: string;
+  email?: string;
+}
+
+export interface ConfluenceTestResult {
+  success: boolean;
+  overrideCount?: number;
+  error?: string;
+}

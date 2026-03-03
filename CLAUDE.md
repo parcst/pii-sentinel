@@ -36,7 +36,7 @@ Both modes produce identical `DatabaseResult[]` output, so the results tree, fil
 
 ### Server (`server/src/`)
 
-Express on port 3001 with four route groups:
+Express on port 3001 with five route groups:
 
 | Route | Purpose |
 |-------|---------|
@@ -53,6 +53,11 @@ Express on port 3001 with four route groups:
 | `GET /api/teleport/scan?cluster&instance&databases` | SSE stream of live PII scan results |
 | `POST /api/teleport/cancel` | Cancel active SSE scan |
 | `POST /api/teleport/shutdown` | Abort scan + clean up all tunnels (sendBeacon target) |
+| `GET /api/settings/confluence` | Confluence config status (configured, source, masked fields) |
+| `PUT /api/settings/confluence` | Save Confluence config to file |
+| `DELETE /api/settings/confluence` | Remove file-based Confluence config |
+| `POST /api/settings/confluence/test` | Test Confluence connection with provided credentials, return override count |
+| `POST /api/settings/confluence/validate` | Test the currently resolved config (env or file), return override count |
 
 **Service pipeline:** Scanner -> Parser -> PII Detector -> Exporter
 
@@ -67,6 +72,10 @@ Express on port 3001 with four route groups:
 - **PII Overrides** (`services/pii-overrides.ts`) - Explicit table+column overrides for columns whose names are too generic to pattern-match globally (e.g. `code`, `short_key`, `entry_code`) but are confirmed PII on specific tables. Uses an O(1) Map lookup keyed by `tablename.columnname`. Override matches get `matchedOn: 'override'`. Also provides `mergeOverrides()` and `getOverridesFromMap()` for combining static and Confluence overrides into a single lookup.
 
 - **Confluence Overrides** (`services/confluence-overrides.ts`) - Dynamically fetches the Confluence PII reference page at scan time via REST API v1 (Basic auth). Parses the HTML table using `cheerio` to extract table+column PII/sensitive entries and converts them to `TableColumnOverride[]`. Falls back gracefully (empty array + warning log) on any failure so scans always complete. Confluence matches get `matchedOn: 'confluence'`.
+
+- **Config Store** (`services/config-store.ts`) - Reads/writes `server/data/config.json` via `fs/promises`. Provides `loadConfig()`, `saveConfig()`, and `clearConfluenceConfig()`. Auto-creates the `data/` directory on first save.
+
+- **Confluence Config Resolution** (`services/confluence-config.ts`) - Single source of truth for Confluence credentials. `resolveConfluenceConfig()` returns config with priority: env vars (all 4 set) > file config (`data/config.json`) > null. Used by both scan routes and live scanner.
 
 - **Exporter** (`services/exporter.ts`) - Flattens scan results tree into CSV rows.
 
@@ -84,6 +93,7 @@ Express on port 3001 with four route groups:
 **Hooks:**
 - `useScan` — Directory scan lifecycle (path, loading, error, results)
 - `useTeleport` — Teleport lifecycle: cluster loading, login polling (2s interval), instance loading, database discovery, SSE scan (EventSource open/message/error/close), cancel. Sends `sendBeacon` to `/api/teleport/shutdown` on `beforeunload` for auto-cleanup on page close.
+- `useConfluenceStatus` — Fetches Confluence config status on mount, provides `refresh()` for re-fetching after save/remove
 
 **Scan Components (`components/scan/`):**
 - `ScanModeToggle` — Radio-style button group (Directory / Live Database), disables Live if tsh unavailable
@@ -94,6 +104,10 @@ Express on port 3001 with four route groups:
 - `TeleportControls` — Cluster dropdown, Login button + status indicator, Instance dropdown, database picker, Scan/Cancel button (live mode)
 - `TeleportDatabasePicker` — Checkbox list with Select All/Deselect All, loading spinner, count label
 - `LiveScanProgress` — Streaming progress spinner + collapsible errors panel (live mode)
+
+**Settings Components (`components/settings/`):**
+- `ConfluenceBanner` — Sidebar callout: shows setup prompt (dismissible via localStorage) when unconfigured, green "linked" indicator when configured, "Edit" button to open modal
+- `ConfluenceSetupModal` — Modal form for Confluence credentials (Base URL, Email, API Token, Page ID). Test Connection button, Save/Cancel/Remove. Read-only when config source is env vars
 
 ### Key Types
 
@@ -145,7 +159,9 @@ Live database scanning via Teleport tunnels. Requires `tsh` binary (Teleport CLI
 
 Optional live override integration with Confluence PII reference page. When configured, the scan fetches the Confluence page and merges its entries with static overrides.
 
-**Setup:** Copy `server/.env.example` to `server/.env` and fill in credentials:
+**Setup (two options):**
+1. **UI (recommended):** Click "Set Up" in the sidebar Confluence banner, fill in credentials, test, and save. Config is persisted to `server/data/config.json`.
+2. **Env vars:** Copy `server/.env.example` to `server/.env` and fill in credentials (takes priority over file config):
 ```
 CONFLUENCE_BASE_URL=https://your-org.atlassian.net
 CONFLUENCE_EMAIL=your-email@company.com
@@ -153,8 +169,11 @@ CONFLUENCE_API_TOKEN=your-api-token
 CONFLUENCE_PAGE_ID=123456789
 ```
 
+**Config resolution priority:** env vars (all 4 set) > file config (`server/data/config.json`) > null (scan without Confluence)
+
 **How it works:**
-- At scan time, if all four env vars are set, the server fetches the Confluence page HTML via REST API v1
+- At scan time, `resolveConfluenceConfig()` determines which config source to use
+- The server fetches the Confluence page HTML via REST API v1
 - The HTML table is parsed with `cheerio` — rows with IsPII=Y get tier `high`, rows with only Sensitive Data=Y get tier `medium`
 - Confluence overrides are merged with static `TABLE_COLUMN_OVERRIDES` (both kept, no dedup)
 - The merged override map is passed to `analyzeTable()` for each file

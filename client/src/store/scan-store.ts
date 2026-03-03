@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ScanResponse, ScanSummary, DatabaseResult, ConfidenceTier, PiiCategory, ScanMode, TeleportInstance, TeleportStatus } from '../api/types';
+import type { ScanResponse, ScanSummary, DatabaseResult, ConfidenceTier, PiiCategory, ScanMode, TeleportInstance, TeleportStatus, ConfluenceStatus } from '../api/types';
 
 interface ScanStore {
   // Scan mode
@@ -33,9 +33,21 @@ interface ScanStore {
   searchQuery: string;
   excludeConfluence: boolean;
 
+  // Confluence setup
+  confluenceStatus: ConfluenceStatus | null;
+  confluenceSetupOpen: boolean;
+  pendingScanAction: (() => void) | null;
+  confluenceValidationError: string | null;
+
   // UI state
   expandedDatabases: Set<string>;
   expandedTables: Set<string>;
+
+  // Confluence actions
+  setConfluenceStatus: (status: ConfluenceStatus | null) => void;
+  setConfluenceSetupOpen: (open: boolean) => void;
+  setPendingScanAction: (action: (() => void) | null) => void;
+  setConfluenceValidationError: (error: string | null) => void;
 
   // Actions
   setScanMode: (mode: ScanMode) => void;
@@ -96,6 +108,12 @@ export const useScanStore = create<ScanStore>((set, get) => ({
   selectedDatabases: new Set<string>(),
   discoveringDatabases: false,
 
+  // Confluence setup
+  confluenceStatus: null,
+  confluenceSetupOpen: false,
+  pendingScanAction: null,
+  confluenceValidationError: null,
+
   // Streaming state
   streamingProgress: '',
   scanErrors: [],
@@ -110,6 +128,12 @@ export const useScanStore = create<ScanStore>((set, get) => ({
   // UI state
   expandedDatabases: new Set<string>(),
   expandedTables: new Set<string>(),
+
+  // Confluence actions
+  setConfluenceStatus: (status) => set({ confluenceStatus: status }),
+  setConfluenceSetupOpen: (open) => set({ confluenceSetupOpen: open }),
+  setPendingScanAction: (action) => set({ pendingScanAction: action }),
+  setConfluenceValidationError: (error) => set({ confluenceValidationError: error }),
 
   // Actions
   setScanMode: (mode) => set({ scanMode: mode }),

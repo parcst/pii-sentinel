@@ -5,9 +5,9 @@ import { parseTableFile } from '../services/parser.js';
 import { analyzeTable } from '../services/pii-detector.js';
 import { TABLE_COLUMN_OVERRIDES, mergeOverrides } from '../services/pii-overrides.js';
 import { loadConfluenceOverrides } from '../services/confluence-overrides.js';
+import { resolveConfluenceConfig } from '../services/confluence-config.js';
 import {
   ConfidenceTier,
-  ConfluenceConfig,
   PiiCategory,
   DatabaseResult,
   ScanResponse,
@@ -29,19 +29,13 @@ router.post('/', async (req: Request, res: Response) => {
   try {
     const startTime = Date.now();
 
-    // 0. Check for Confluence credentials and load overrides
+    // 0. Check for Confluence config and load overrides
     let confluenceActive = false;
     let overrideMap: Map<string, TableColumnOverride[]> | undefined;
 
-    const { CONFLUENCE_BASE_URL, CONFLUENCE_EMAIL, CONFLUENCE_API_TOKEN, CONFLUENCE_PAGE_ID } = process.env;
-    if (CONFLUENCE_BASE_URL && CONFLUENCE_EMAIL && CONFLUENCE_API_TOKEN && CONFLUENCE_PAGE_ID) {
-      const config: ConfluenceConfig = {
-        baseUrl: CONFLUENCE_BASE_URL,
-        email: CONFLUENCE_EMAIL,
-        apiToken: CONFLUENCE_API_TOKEN,
-        pageId: CONFLUENCE_PAGE_ID,
-      };
-      const confluenceOverrides = await loadConfluenceOverrides(config);
+    const resolved = await resolveConfluenceConfig();
+    if (resolved) {
+      const confluenceOverrides = await loadConfluenceOverrides(resolved.config);
       overrideMap = mergeOverrides(TABLE_COLUMN_OVERRIDES, confluenceOverrides);
       confluenceActive = confluenceOverrides.length > 0;
     }

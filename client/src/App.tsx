@@ -9,11 +9,15 @@ import FilterBar from './components/results/FilterBar';
 import ExportButton from './components/results/ExportButton';
 import SummaryBar from './components/results/SummaryBar';
 import ResultsTree from './components/results/ResultsTree';
+import ConfluenceBanner from './components/settings/ConfluenceBanner';
+import ConfluenceSetupModal from './components/settings/ConfluenceSetupModal';
 import { useScan } from './hooks/useScan';
+import { useConfluenceStatus } from './hooks/useConfluenceStatus';
 import { useScanStore } from './store/scan-store';
 
 export default function App() {
   const { scanPath, setScanPath, runScan, loading } = useScan();
+  const { refresh: refreshConfluence } = useConfluenceStatus();
   const { results, error, scanMode } = useScanStore();
 
   return (
@@ -25,6 +29,7 @@ export default function App() {
         <aside className="w-80 shrink-0 border-r border-gray-800 bg-gray-900 flex flex-col overflow-y-auto">
           <div className="p-4 space-y-4">
             <ScanModeToggle />
+            <ConfluenceBanner />
 
             {scanMode === 'directory' ? (
               <>
@@ -50,6 +55,8 @@ export default function App() {
           <ResultsTree />
         </main>
       </div>
+
+      <ConfluenceSetupModal onSaved={refreshConfluence} />
     </div>
   );
 }

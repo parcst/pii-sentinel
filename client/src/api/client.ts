@@ -1,4 +1,4 @@
-import type { BrowseResponse, ValidatePathResponse, ScanResponse, DatabaseResult, TeleportInstance, TeleportStatus } from './types';
+import type { BrowseResponse, ValidatePathResponse, ScanResponse, DatabaseResult, TeleportInstance, TeleportStatus, ConfluenceStatus, ConfluenceTestResult } from './types';
 
 async function post<T>(url: string, body: Record<string, unknown>): Promise<T> {
   const res = await fetch(url, {
@@ -15,6 +15,28 @@ async function post<T>(url: string, body: Record<string, unknown>): Promise<T> {
 
 async function get<T>(url: string): Promise<T> {
   const res = await fetch(url);
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `Request failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+async function put<T>(url: string, body: Record<string, unknown>): Promise<T> {
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `Request failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+async function del<T>(url: string): Promise<T> {
+  const res = await fetch(url, { method: 'DELETE' });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error || `Request failed: ${res.status}`);
@@ -91,4 +113,44 @@ export function teleportScanUrl(cluster: string, instance: string, databases: st
 
 export function teleportCancel(): Promise<{ cancelled: boolean }> {
   return post('/api/teleport/cancel', {});
+}
+
+// ===== Settings API =====
+
+export function getConfluenceStatus(): Promise<ConfluenceStatus> {
+  return get('/api/settings/confluence');
+}
+
+/**
+ * Parse a Confluence page URL into baseUrl + pageId.
+ * Accepts: https://org.atlassian.net/wiki/spaces/SPACE/pages/123456789/Page+Title
+ */
+export function parseConfluenceUrl(url: string): { baseUrl: string; pageId: string } | null {
+  try {
+    const parsed = new URL(url);
+    const match = parsed.pathname.match(/\/wiki\/.*?\/pages\/(\d+)/);
+    if (!match) return null;
+    return {
+      baseUrl: `${parsed.protocol}//${parsed.host}`,
+      pageId: match[1],
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function saveConfluenceConfig(config: { baseUrl: string; email: string; apiToken: string; pageId: string }): Promise<{ saved: boolean }> {
+  return put('/api/settings/confluence', config);
+}
+
+export function removeConfluenceConfig(): Promise<{ removed: boolean }> {
+  return del('/api/settings/confluence');
+}
+
+export function testConfluenceConnection(config: { baseUrl: string; email: string; apiToken: string; pageId: string }): Promise<ConfluenceTestResult> {
+  return post('/api/settings/confluence/test', config);
+}
+
+export function validateConfluenceConnection(): Promise<ConfluenceTestResult & { source?: string }> {
+  return post('/api/settings/confluence/validate', {});
 }

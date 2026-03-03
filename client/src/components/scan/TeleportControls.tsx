@@ -1,5 +1,7 @@
+import { useCallback } from 'react';
 import { useScanStore } from '../../store/scan-store';
 import { useTeleport } from '../../hooks/useTeleport';
+import { validateConfluenceConnection } from '../../api/client';
 import TeleportDatabasePicker from './TeleportDatabasePicker';
 
 export default function TeleportControls() {
@@ -16,6 +18,32 @@ export default function TeleportControls() {
   const { selectCluster, login, selectInstance, startLiveScan, cancelLiveScan } = useTeleport();
 
   const canScan = selectedCluster && selectedInstance && selectedDatabases.size > 0 && !liveScanning;
+
+  const handleScan = useCallback(async () => {
+    const { confluenceStatus, setConfluenceSetupOpen, setPendingScanAction, setConfluenceValidationError } = useScanStore.getState();
+
+    // Not configured — show setup modal
+    if (!confluenceStatus?.configured) {
+      setPendingScanAction(startLiveScan);
+      setConfluenceSetupOpen(true);
+      return;
+    }
+
+    // Configured — validate first
+    try {
+      const result = await validateConfluenceConnection();
+      if (!result.success) {
+        setConfluenceValidationError(result.error ?? 'Connection failed');
+        setPendingScanAction(startLiveScan);
+        setConfluenceSetupOpen(true);
+        return;
+      }
+    } catch {
+      // Validation request itself failed — let scan proceed
+    }
+
+    startLiveScan();
+  }, [startLiveScan]);
 
   return (
     <div className="space-y-3">
@@ -87,7 +115,7 @@ export default function TeleportControls() {
             </button>
           ) : (
             <button
-              onClick={startLiveScan}
+              onClick={handleScan}
               disabled={!canScan}
               className={`w-full font-medium py-2 px-4 rounded text-sm transition-colors ${
                 canScan
