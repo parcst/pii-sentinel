@@ -128,6 +128,7 @@ Express on port 3001 with six route groups:
 **Results Components (`components/results/`):**
 - `ExcludeScopePopover` — Inline absolute-positioned popover for choosing exclusion scope (global vs database-scoped). Anchored to Exclude button, dismisses on click-outside.
 - `ClearExclusionsDialog` — Confirmation modal for clearing all exclusions.
+- `SuggestExclusionsModal` — Modal for batch-excluding columns similar to already-excluded ones. Two match modes: "Similar pattern" (groups by shared PII match label) and "Exact column name only" (groups by identical column name). Supports global or database-scoped exclusion, group-level checkboxes (with indeterminate state), and select all/deselect all.
 
 **UI Components (`components/ui/`):**
 - `ExclusionToast` — Fixed bottom-center toast showing exclusion count with Undo button. 5-second auto-dismiss, timer resets on each new exclusion. Undo reverses all items in current batch.
@@ -142,6 +143,7 @@ Users can manually exclude false-positive PII columns from scan results. Exclusi
 - Client-side filtering: server returns full scan results, client applies exclusion filter in `matchesFilters()`
 - Optimistic updates: local store updates immediately, server sync async with rollback on error
 - Toast stacking: single toast with incrementing count, 5-second auto-dismiss, Undo reverses all queued items
+- Suggest Similar Exclusions: "Suggest Exclusions" button appears in sidebar when exclusions exist and results are loaded. Opens modal showing non-excluded columns that share PII match labels with already-excluded columns, grouped by label, for batch exclusion.
 - FilterBar shows "Show excluded (N)" checkbox and "Clear all exclusions" link when exclusions exist
 - SummaryBar shows "(N excluded)" annotation when applicable
 - Excluded rows render with `opacity-40`, strikethrough on column name, and "excluded by [user]" label

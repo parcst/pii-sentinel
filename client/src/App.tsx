@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Header from './components/layout/Header';
 import FolderInput from './components/scan/FolderInput';
 import ScanButton from './components/scan/ScanButton';
@@ -12,6 +12,7 @@ import SummaryBar from './components/results/SummaryBar';
 import ResultsTree from './components/results/ResultsTree';
 import ConfluenceBanner from './components/settings/ConfluenceBanner';
 import ConfluenceSetupModal from './components/settings/ConfluenceSetupModal';
+import SuggestExclusionsModal from './components/results/SuggestExclusionsModal';
 import ExclusionToast from './components/ui/ExclusionToast';
 import { useScan } from './hooks/useScan';
 import { useConfluenceStatus } from './hooks/useConfluenceStatus';
@@ -19,6 +20,7 @@ import { useExclusionsLoader } from './hooks/useExclusions';
 import { useScanStore } from './store/scan-store';
 
 export default function App() {
+  const [suggestModalOpen, setSuggestModalOpen] = useState(false);
   const { scanPath, setScanPath, runScan, loading } = useScan();
   const { refresh: refreshConfluence } = useConfluenceStatus();
   useExclusionsLoader();
@@ -71,6 +73,14 @@ export default function App() {
 
             <FilterBar />
             <ExportButton />
+            {exclusions.length > 0 && results && (
+              <button
+                onClick={() => setSuggestModalOpen(true)}
+                className="w-full py-2 text-sm rounded border border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-gray-100 transition-colors"
+              >
+                Suggest Exclusions
+              </button>
+            )}
           </div>
         </aside>
 
@@ -82,6 +92,13 @@ export default function App() {
       </div>
 
       <ConfluenceSetupModal onSaved={refreshConfluence} />
+      {suggestModalOpen && results && (
+        <SuggestExclusionsModal
+          results={results}
+          exclusions={exclusions}
+          onClose={() => setSuggestModalOpen(false)}
+        />
+      )}
       <ExclusionToast />
     </div>
   );
