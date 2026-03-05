@@ -23,6 +23,10 @@ export function unregisterTunnel(dbName: string): void {
   activeTunnels.delete(dbName);
 }
 
+export function getActiveTunnel(dbName: string): TeleportTunnel | undefined {
+  return activeTunnels.get(dbName);
+}
+
 /**
  * Kill all registered tunnels and run `tsh db logout` for each.
  * Idempotent — safe to call multiple times.

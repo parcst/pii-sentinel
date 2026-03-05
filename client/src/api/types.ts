@@ -32,6 +32,13 @@ export interface TableResult {
   filePath: string;
   totalColumns: number;
   piiColumns: PiiColumn[];
+  primaryKey: string[];
+}
+
+export interface DataSampleResponse {
+  sql: string;
+  columns: [string, string];
+  rows: Array<[unknown, unknown]>;
 }
 
 export interface LocationInfo {
@@ -127,4 +134,33 @@ export interface ConfluenceTestResult {
   success: boolean;
   overrideCount?: number;
   error?: string;
+}
+
+export interface JiraStatus {
+  configured: boolean;
+  source?: 'env' | 'file';
+  baseUrl?: string;
+  email?: string;
+  projectKeys?: string[];
+  confluenceCredentials?: { baseUrl: string; email: string };
+}
+
+export interface JiraTestResult {
+  success: boolean;
+  error?: string;
+}
+
+export interface JiraTicketEntry {
+  table: string;
+  column: string;
+  ticketKeys: string[];
+  ticketUrls: string[];
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface CreateTicketResponse {
+  ticketKeys: string[];
+  ticketUrls: string[];
+  alreadyExists?: boolean;
 }

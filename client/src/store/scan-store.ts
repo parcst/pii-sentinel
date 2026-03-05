@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ScanResponse, ScanSummary, DatabaseResult, ConfidenceTier, PiiCategory, ScanMode, TeleportInstance, TeleportStatus, ConfluenceStatus, ExclusionEntry } from '../api/types';
+import type { ScanResponse, ScanSummary, DatabaseResult, ConfidenceTier, PiiCategory, ScanMode, TeleportInstance, TeleportStatus, ConfluenceStatus, ExclusionEntry, JiraStatus, JiraTicketEntry } from '../api/types';
 
 interface ScanStore {
   // Scan mode
@@ -40,6 +40,14 @@ interface ScanStore {
   confluenceValidationError: string | null;
   confluenceValid: boolean | null; // null = not checked, true = working, false = broken
 
+  // Jira setup
+  jiraStatus: JiraStatus | null;
+  jiraSetupOpen: boolean;
+  jiraValid: boolean | null;
+  jiraValidationError: string | null;
+  jiraTickets: JiraTicketEntry[];
+  jiraToast: { type: 'success'; ticketKeys: string[]; ticketUrls: string[] } | { type: 'error'; message: string } | null;
+
   // Exclusions
   exclusions: ExclusionEntry[];
   osUsername: string;
@@ -49,6 +57,17 @@ interface ScanStore {
   // UI state
   expandedDatabases: Set<string>;
   expandedTables: Set<string>;
+
+  // Jira actions
+  setJiraStatus: (status: JiraStatus | null) => void;
+  setJiraSetupOpen: (open: boolean) => void;
+  setJiraValid: (valid: boolean | null) => void;
+  setJiraValidationError: (error: string | null) => void;
+  setJiraTickets: (tickets: JiraTicketEntry[]) => void;
+  addJiraTicket: (ticket: JiraTicketEntry) => void;
+  removeJiraTicket: (table: string, column: string) => void;
+  setJiraToast: (toast: { type: 'success'; ticketKeys: string[]; ticketUrls: string[] } | { type: 'error'; message: string } | null) => void;
+  clearJiraToast: () => void;
 
   // Exclusion actions
   setExclusions: (exclusions: ExclusionEntry[]) => void;
@@ -126,6 +145,14 @@ export const useScanStore = create<ScanStore>((set, get) => ({
   selectedDatabases: new Set<string>(),
   discoveringDatabases: false,
 
+  // Jira setup
+  jiraStatus: null,
+  jiraSetupOpen: false,
+  jiraValid: null,
+  jiraValidationError: null,
+  jiraTickets: [],
+  jiraToast: null,
+
   // Exclusions
   exclusions: [],
   osUsername: '',
@@ -168,6 +195,17 @@ export const useScanStore = create<ScanStore>((set, get) => ({
   clearAllExclusionsLocal: () => set({ exclusions: [], showExcluded: false }),
   pushToast: (item) => set({ toastQueue: [...get().toastQueue, item] }),
   clearToast: () => set({ toastQueue: [] }),
+
+  // Jira actions
+  setJiraStatus: (status) => set({ jiraStatus: status }),
+  setJiraSetupOpen: (open) => set({ jiraSetupOpen: open }),
+  setJiraValid: (valid) => set({ jiraValid: valid }),
+  setJiraValidationError: (error) => set({ jiraValidationError: error }),
+  setJiraTickets: (tickets) => set({ jiraTickets: tickets }),
+  addJiraTicket: (ticket) => set({ jiraTickets: [...get().jiraTickets, ticket] }),
+  removeJiraTicket: (table, column) => set({ jiraTickets: get().jiraTickets.filter(t => !(t.table === table && t.column === column)) }),
+  setJiraToast: (toast) => set({ jiraToast: toast }),
+  clearJiraToast: () => set({ jiraToast: null }),
 
   // Confluence actions
   setConfluenceStatus: (status) => set({ confluenceStatus: status }),

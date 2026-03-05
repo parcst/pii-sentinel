@@ -1,10 +1,12 @@
-import type { TableResult, ExclusionEntry } from '../../api/types';
+import type { TableResult, ExclusionEntry, ScanMode } from '../../api/types';
 import ColumnRow from './ColumnRow';
 
 interface Props {
   table: TableResult;
   displayPath: string;
   dbLabel: string;
+  scanMode: ScanMode;
+  connectionInfo?: { cluster: string; instance: string; database: string };
   expanded: boolean;
   onToggle: () => void;
   exclusions: ExclusionEntry[];
@@ -12,7 +14,7 @@ interface Props {
   onInclude: (entry: ExclusionEntry) => void;
 }
 
-export default function TableGroup({ table, displayPath, dbLabel, expanded, onToggle, exclusions, onExclude, onInclude }: Props) {
+export default function TableGroup({ table, displayPath, dbLabel, scanMode, connectionInfo, expanded, onToggle, exclusions, onExclude, onInclude }: Props) {
   function getExclusionFor(columnName: string): ExclusionEntry | undefined {
     return exclusions.find(
       (e) =>
@@ -59,6 +61,9 @@ export default function TableGroup({ table, displayPath, dbLabel, expanded, onTo
                 tableName={table.tableName}
                 displayPath={displayPath}
                 dbLabel={dbLabel}
+                scanMode={scanMode}
+                connectionInfo={connectionInfo}
+                primaryKey={table.primaryKey}
                 isExcluded={!!exclusion}
                 excludedBy={exclusion?.excludedBy ?? null}
                 onExclude={onExclude}

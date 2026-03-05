@@ -69,6 +69,7 @@ export function parseCreateTable(raw: string): ParsedTable {
   }
 
   const columns: ParsedColumn[] = [];
+  const primaryKey: string[] = [];
   const defs = stmt.create_definitions || [];
   for (const def of defs) {
     if (def.resource === 'column') {
@@ -77,10 +78,18 @@ export function parseCreateTable(raw: string): ParsedTable {
         dataType: buildDataType(def.definition).toUpperCase(),
         fullDefinition: columnDefToString(def),
       });
+    } else if (
+      def.resource === 'constraint' &&
+      def.constraint_type === 'primary key' &&
+      Array.isArray(def.definition)
+    ) {
+      for (const d of def.definition) {
+        if (d.column) primaryKey.push(d.column);
+      }
     }
   }
 
-  return { tableName, columns, raw };
+  return { tableName, columns, primaryKey, raw };
 }
 
 function fallbackParse(raw: string, tableName: string): ParsedTable {
@@ -101,7 +110,17 @@ function fallbackParse(raw: string, tableName: string): ParsedTable {
     columns.push({ name, dataType, fullDefinition });
   }
 
-  return { tableName, columns, raw };
+  // Extract PRIMARY KEY columns
+  const primaryKey: string[] = [];
+  const pkMatch = raw.match(/PRIMARY\s+KEY\s*\(([^)]+)\)/i);
+  if (pkMatch) {
+    const cols = pkMatch[1].split(',');
+    for (const col of cols) {
+      primaryKey.push(col.trim().replace(/`/g, ''));
+    }
+  }
+
+  return { tableName, columns, primaryKey, raw };
 }
 
 export async function parseTableFile(filePath: string): Promise<ParsedTable> {

@@ -122,5 +122,6 @@ export function analyzeTable(
     filePath,
     totalColumns: parsed.columns.length,
     piiColumns,
+    primaryKey: parsed.primaryKey,
   };
 }

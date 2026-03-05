@@ -19,6 +19,7 @@ export interface ParsedColumn {
 export interface ParsedTable {
   tableName: string;
   columns: ParsedColumn[];
+  primaryKey: string[];
   raw: string;
 }
 
@@ -55,6 +56,13 @@ export interface ConfluenceConfig {
   pageId: string;
 }
 
+export interface JiraConfig {
+  baseUrl: string;
+  email: string;
+  apiToken: string;
+  projectKeys: string[];
+}
+
 export interface PiiColumn {
   columnName: string;
   dataType: string;
@@ -69,6 +77,7 @@ export interface TableResult {
   filePath: string;
   totalColumns: number;
   piiColumns: PiiColumn[];
+  primaryKey: string[];
 }
 
 export interface LocationInfo {

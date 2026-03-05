@@ -1,8 +1,9 @@
-import type { DatabaseResult, ExclusionEntry } from '../../api/types';
+import type { DatabaseResult, ExclusionEntry, ScanMode } from '../../api/types';
 import TableGroup from './TableGroup';
 
 interface Props {
   database: DatabaseResult;
+  scanMode: ScanMode;
   expanded: boolean;
   onToggle: () => void;
   expandedTables: Set<string>;
@@ -12,7 +13,7 @@ interface Props {
   onInclude: (entry: ExclusionEntry) => void;
 }
 
-export default function DatabaseGroup({ database, expanded, onToggle, expandedTables, onToggleTable, exclusions, onExclude, onInclude }: Props) {
+export default function DatabaseGroup({ database, scanMode, expanded, onToggle, expandedTables, onToggleTable, exclusions, onExclude, onInclude }: Props) {
   const { location } = database;
   // Build a clean label from location fields, skipping "unknown" values
   const allParts = [location.cluster, location.connection, location.region, location.instance, location.database];
@@ -26,6 +27,10 @@ export default function DatabaseGroup({ database, expanded, onToggle, expandedTa
       ? knownParts.join(' / ')
       : '(root)';
   const cleanDisplayPath = knownParts.length > 0 ? knownParts.join('/') : '';
+
+  const connectionInfo = scanMode === 'live'
+    ? { cluster: location.cluster, instance: location.connection, database: location.database }
+    : undefined;
 
   return (
     <div className="border-b border-gray-800/50">
@@ -54,6 +59,8 @@ export default function DatabaseGroup({ database, expanded, onToggle, expandedTa
                 table={table}
                 displayPath={database.displayPath}
                 dbLabel={dbLabel}
+                scanMode={scanMode}
+                connectionInfo={connectionInfo}
                 expanded={expandedTables.has(tableKey)}
                 onToggle={() => onToggleTable(tableKey)}
                 exclusions={exclusions}

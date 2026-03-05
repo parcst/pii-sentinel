@@ -6,6 +6,7 @@ import exportRouter from './routes/export.js';
 import teleportRouter from './routes/teleport.js';
 import settingsRouter from './routes/settings.js';
 import exclusionsRouter from './routes/exclusions.js';
+import jiraRouter from './routes/jira.js';
 import { cleanupAll } from './services/teleport.js';
 
 const app = express();
@@ -20,6 +21,7 @@ app.use('/api/export', exportRouter);
 app.use('/api/teleport', teleportRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/exclusions', exclusionsRouter);
+app.use('/api/jira', jiraRouter);
 
 app.listen(PORT, () => {
   console.log(`PII Sentinel server running on http://localhost:${PORT}`);

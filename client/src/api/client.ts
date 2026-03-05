@@ -1,4 +1,4 @@
-import type { BrowseResponse, ValidatePathResponse, ScanResponse, DatabaseResult, TeleportInstance, TeleportStatus, ConfluenceStatus, ConfluenceTestResult, ExclusionsResponse } from './types';
+import type { BrowseResponse, ValidatePathResponse, ScanResponse, DatabaseResult, TeleportInstance, TeleportStatus, ConfluenceStatus, ConfluenceTestResult, ExclusionsResponse, DataSampleResponse, JiraStatus, JiraTestResult, JiraTicketEntry, CreateTicketResponse } from './types';
 
 async function post<T>(url: string, body: Record<string, unknown>): Promise<T> {
   const res = await fetch(url, {
@@ -128,6 +128,10 @@ export function teleportCancel(): Promise<{ cancelled: boolean }> {
   return post('/api/teleport/cancel', {});
 }
 
+export function fetchDataSample(params: { cluster: string; instance: string; database: string; table: string; column: string; pkColumn: string }): Promise<DataSampleResponse> {
+  return post('/api/teleport/data-sample', params);
+}
+
 // ===== Settings API =====
 
 export function getConfluenceStatus(): Promise<ConfluenceStatus> {
@@ -184,4 +188,40 @@ export function removeExclusion(entry: { table: string; column: string; scope: s
 
 export function clearAllExclusions(): Promise<{ success: boolean }> {
   return del('/api/exclusions/all');
+}
+
+// ===== Jira Settings API =====
+
+export function getJiraStatus(): Promise<JiraStatus> {
+  return get('/api/settings/jira');
+}
+
+export function saveJiraConfig(config: { baseUrl: string; email: string; apiToken: string; projectKey1: string; projectKey2: string }): Promise<{ saved: boolean }> {
+  return put('/api/settings/jira', config);
+}
+
+export function removeJiraConfig(): Promise<{ removed: boolean }> {
+  return del('/api/settings/jira');
+}
+
+export function testJiraConnection(config: { baseUrl: string; email: string; apiToken: string; projectKey1: string; projectKey2: string }): Promise<JiraTestResult> {
+  return post('/api/settings/jira/test', config);
+}
+
+export function validateJiraConnection(): Promise<JiraTestResult & { source?: string }> {
+  return post('/api/settings/jira/validate', {});
+}
+
+// ===== Jira Tickets API =====
+
+export function getJiraTickets(): Promise<{ tickets: JiraTicketEntry[] }> {
+  return get('/api/jira/tickets');
+}
+
+export function createJiraTicket(params: { table: string; column: string; dataType: string; tier: string; category: string; location: string }): Promise<CreateTicketResponse> {
+  return post('/api/jira/create-ticket', params);
+}
+
+export function verifyJiraTicket(params: { table: string; column: string }): Promise<{ exists: boolean; removed: boolean }> {
+  return post('/api/jira/verify-ticket', params);
 }

@@ -12,10 +12,14 @@ import SummaryBar from './components/results/SummaryBar';
 import ResultsTree from './components/results/ResultsTree';
 import ConfluenceBanner from './components/settings/ConfluenceBanner';
 import ConfluenceSetupModal from './components/settings/ConfluenceSetupModal';
+import JiraBanner from './components/settings/JiraBanner';
+import JiraSetupModal from './components/settings/JiraSetupModal';
 import SuggestExclusionsModal from './components/results/SuggestExclusionsModal';
 import ExclusionToast from './components/ui/ExclusionToast';
+import JiraToast from './components/ui/JiraToast';
 import { useScan } from './hooks/useScan';
 import { useConfluenceStatus } from './hooks/useConfluenceStatus';
+import { useJiraStatus } from './hooks/useJiraStatus';
 import { useExclusionsLoader } from './hooks/useExclusions';
 import { useScanStore } from './store/scan-store';
 
@@ -23,6 +27,7 @@ export default function App() {
   const [suggestModalOpen, setSuggestModalOpen] = useState(false);
   const { scanPath, setScanPath, runScan, loading } = useScan();
   const { refresh: refreshConfluence } = useConfluenceStatus();
+  const { refresh: refreshJira } = useJiraStatus();
   useExclusionsLoader();
   const { results, error, scanMode, exclusions } = useScanStore();
 
@@ -57,6 +62,7 @@ export default function App() {
           <div className="p-4 space-y-4">
             <ScanModeToggle />
             <ConfluenceBanner />
+            <JiraBanner />
 
             {scanMode === 'directory' ? (
               <>
@@ -92,6 +98,7 @@ export default function App() {
       </div>
 
       <ConfluenceSetupModal onSaved={refreshConfluence} />
+      <JiraSetupModal onSaved={refreshJira} />
       {suggestModalOpen && results && (
         <SuggestExclusionsModal
           results={results}
@@ -100,6 +107,7 @@ export default function App() {
         />
       )}
       <ExclusionToast />
+      <JiraToast />
     </div>
   );
 }

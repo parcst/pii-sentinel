@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { findTsh, getClusters, getLoginStatus, loginToCluster, listMysqlInstances, cleanupAll } from '../services/teleport.js';
 import { liveScan, discoverDatabases } from '../services/live-scanner.js';
+import { fetchDataSample } from '../services/data-sample.js';
 
 const router = Router();
 
@@ -159,6 +160,24 @@ router.get('/scan', async (req: Request, res: Response) => {
       activeScanAbort = null;
     }
     res.end();
+  }
+});
+
+/**
+ * POST /api/teleport/data-sample
+ * Fetch a small sample of rows for a specific PII column.
+ */
+router.post('/data-sample', async (req: Request, res: Response) => {
+  try {
+    const { cluster, instance, database, table, column, pkColumn } = req.body;
+    if (!cluster || !instance || !database || !table || !column || !pkColumn) {
+      res.status(400).json({ error: 'cluster, instance, database, table, column, and pkColumn are required' });
+      return;
+    }
+    const result = await fetchDataSample({ cluster, instance, database, table, column, pkColumn });
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 

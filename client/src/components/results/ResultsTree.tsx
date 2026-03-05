@@ -55,6 +55,7 @@ function matchesFilters(
 export default function ResultsTree() {
   const {
     results,
+    scanMode,
     tierFilter,
     categoryFilter,
     searchQuery,
@@ -120,6 +121,7 @@ export default function ResultsTree() {
         <DatabaseGroup
           key={db.displayPath}
           database={db}
+          scanMode={scanMode}
           expanded={expandedDatabases.has(db.displayPath)}
           onToggle={() => toggleExpandDatabase(db.displayPath)}
           expandedTables={expandedTables}
