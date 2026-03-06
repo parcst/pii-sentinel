@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useScanStore } from '../../store/scan-store';
-import { saveConfluenceConfig, removeConfluenceConfig, testConfluenceConnection, parseConfluenceUrl } from '../../api/client';
+import { saveConfluenceConfig, removeConfluenceConfig, testConfluenceConnection, validateConfluenceConnection, parseConfluenceUrl } from '../../api/client';
 import type { ConfluenceTestResult } from '../../api/types';
 
 /** After saving new config, mark it as valid so scan gates pass immediately. */
@@ -29,6 +29,7 @@ export default function ConfluenceSetupModal({ onSaved }: Props) {
   const isValidationFailedMode = hasPendingScan && isConfigured;
 
   const [pageUrl, setPageUrl] = useState('');
+  const [trackerPageUrl, setTrackerPageUrl] = useState('');
   const [email, setEmail] = useState('');
   const [apiToken, setApiToken] = useState('');
 
@@ -40,10 +41,12 @@ export default function ConfluenceSetupModal({ onSaved }: Props) {
   useEffect(() => {
     if (open && isConfigured) {
       setPageUrl(confluenceStatus?.pageUrl ?? '');
+      setTrackerPageUrl(confluenceStatus?.trackerPageUrl ?? '');
       setEmail(confluenceStatus?.email ?? '');
       setApiToken('');
     } else if (open) {
       setPageUrl('');
+      setTrackerPageUrl('');
       setEmail('');
       setApiToken('');
     }
@@ -61,22 +64,36 @@ export default function ConfluenceSetupModal({ onSaved }: Props) {
 
   const parsed = pageUrl.trim() ? parseConfluenceUrl(pageUrl.trim()) : null;
   const urlValid = !!parsed;
-  const formValid = urlValid && email.trim() && apiToken.trim();
+  const trackerParsed = trackerPageUrl.trim() ? parseConfluenceUrl(trackerPageUrl.trim()) : null;
+  const trackerUrlValid = !trackerPageUrl.trim() || !!trackerParsed;
+  const formValid = urlValid && email.trim() && (apiToken.trim() || isConfigured);
 
   const getConfig = () => {
     if (!parsed) return null;
-    return { baseUrl: parsed.baseUrl, email: email.trim(), apiToken: apiToken.trim(), pageId: parsed.pageId };
+    return {
+      baseUrl: parsed.baseUrl,
+      email: email.trim(),
+      apiToken: apiToken.trim(),
+      pageId: parsed.pageId,
+      ...(trackerParsed ? { trackerPageId: trackerParsed.pageId } : {}),
+    };
   };
 
   const handleTest = async () => {
-    const config = getConfig();
-    if (!config) return;
     setTesting(true);
     setTestResult(null);
     setError(null);
     try {
-      const result = await testConfluenceConnection(config);
-      setTestResult(result);
+      // If no token provided but already configured, test the stored config
+      if (!apiToken.trim() && isConfigured) {
+        const result = await validateConfluenceConnection();
+        setTestResult(result);
+      } else {
+        const config = getConfig();
+        if (!config) return;
+        const result = await testConfluenceConnection(config);
+        setTestResult(result);
+      }
     } catch (err: any) {
       setTestResult({ success: false, error: err.message });
     } finally {
@@ -226,6 +243,21 @@ export default function ConfluenceSetupModal({ onSaved }: Props) {
                 placeholder={isConfigured ? 'Re-enter token to save changes' : 'Atlassian API token'}
                 className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500"
               />
+            </label>
+
+            <label className="block">
+              <span className="text-xs text-gray-400 mb-1 block">Tracker Page URL <span className="text-gray-600">(optional)</span></span>
+              <input
+                type="url"
+                value={trackerPageUrl}
+                onChange={(e) => setTrackerPageUrl(e.target.value)}
+                placeholder="https://your-org.atlassian.net/wiki/spaces/SPACE/pages/123456789/Tracker"
+                className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500"
+              />
+              {trackerPageUrl.trim() && !trackerUrlValid && (
+                <p className="text-xs text-red-400 mt-1">Could not find a page ID in this URL. Paste the full Confluence page URL.</p>
+              )}
+              <p className="text-xs text-gray-600 mt-1">PII tracker page to append rows to when Jira tickets are created.</p>
             </label>
           </div>
 

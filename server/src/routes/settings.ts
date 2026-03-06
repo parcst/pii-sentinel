@@ -23,6 +23,7 @@ router.get('/confluence', async (_req: Request, res: Response) => {
       source,
       pageUrl: `${config.baseUrl}/wiki/spaces/unknown/pages/${config.pageId}`,
       email: config.email,
+      ...(config.trackerPageId ? { trackerPageUrl: `${config.baseUrl}/wiki/spaces/unknown/pages/${config.trackerPageId}` } : {}),
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -32,14 +33,24 @@ router.get('/confluence', async (_req: Request, res: Response) => {
 /** PUT /api/settings/confluence — save config to file */
 router.put('/confluence', async (req: Request, res: Response) => {
   try {
-    const { baseUrl, email, apiToken, pageId } = req.body;
-    if (!baseUrl || !email || !apiToken || !pageId) {
-      res.status(400).json({ error: 'All fields are required: baseUrl, email, apiToken, pageId' });
+    const { baseUrl, email, apiToken, pageId, trackerPageId } = req.body;
+    if (!baseUrl || !email || !pageId) {
+      res.status(400).json({ error: 'Required fields: baseUrl, email, pageId' });
       return;
     }
 
+    // Fall back to stored token if not provided (editing existing config)
     const config = await loadConfig();
-    config.confluence = { baseUrl, email, apiToken, pageId };
+    let resolvedToken = apiToken;
+    if (!resolvedToken) {
+      resolvedToken = config.confluence?.apiToken;
+    }
+    if (!resolvedToken) {
+      res.status(400).json({ error: 'API token is required' });
+      return;
+    }
+
+    config.confluence = { baseUrl, email, apiToken: resolvedToken, pageId, ...(trackerPageId ? { trackerPageId } : {}) };
     await saveConfig(config);
 
     res.json({ saved: true });
@@ -140,14 +151,18 @@ router.put('/jira', async (req: Request, res: Response) => {
       return;
     }
 
-    // If no API token provided, try to reuse Confluence's token
+    // If no API token provided, try stored Jira token, then Confluence token
     let resolvedToken = apiToken;
+    if (!resolvedToken) {
+      const existingConfig = await loadConfig();
+      resolvedToken = existingConfig.jira?.apiToken;
+    }
     if (!resolvedToken) {
       const confluenceResolved = await resolveConfluenceConfig();
       resolvedToken = confluenceResolved?.config.apiToken;
     }
     if (!resolvedToken) {
-      res.status(400).json({ error: 'API token is required (no Confluence token available to share)' });
+      res.status(400).json({ error: 'API token is required (no stored or Confluence token available)' });
       return;
     }
 
@@ -183,14 +198,18 @@ router.post('/jira/test', async (req: Request, res: Response) => {
       return;
     }
 
-    // If no API token provided, try to reuse Confluence's token
+    // If no API token provided, try stored Jira token, then Confluence token
     let resolvedToken = apiToken;
+    if (!resolvedToken) {
+      const existingConfig = await loadConfig();
+      resolvedToken = existingConfig.jira?.apiToken;
+    }
     if (!resolvedToken) {
       const confluenceResolved = await resolveConfluenceConfig();
       resolvedToken = confluenceResolved?.config.apiToken;
     }
     if (!resolvedToken) {
-      res.json({ success: false, error: 'API token is required (no Confluence token available to share)' });
+      res.json({ success: false, error: 'API token is required (no stored or Confluence token available)' });
       return;
     }
 

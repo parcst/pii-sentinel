@@ -54,6 +54,7 @@ export interface ConfluenceConfig {
   email: string;
   apiToken: string;
   pageId: string;
+  trackerPageId?: string;
 }
 
 export interface JiraConfig {

@@ -58,15 +58,20 @@ export function parseConfluenceTable(html: string): TableColumnOverride[] {
       headers.push($(cell).text().trim().toLowerCase());
     });
 
-    const tableIdx = headers.findIndex(h => h === 'table');
-    const columnIdx = headers.findIndex(h => h === 'column');
+    // Support both exact match ("table"/"column") and tracker-style ("table name"/"column name")
+    const tableIdx = headers.findIndex(h => h === 'table' || h === 'table name');
+    const columnIdx = headers.findIndex(h => h === 'column' || h === 'column name');
     const isPiiIdx = headers.findIndex(h => h === 'ispii' || h === 'is pii' || h === 'is_pii');
     const sensitiveIdx = headers.findIndex(h =>
       h.includes('sensitive') && h.includes('data')
     );
 
+    // If table has Table + Column headers but no IsPII/Sensitive columns,
+    // treat every row as implicit PII (e.g. tracker page where all entries are PII)
+    const implicitPii = tableIdx !== -1 && columnIdx !== -1 && isPiiIdx === -1 && sensitiveIdx === -1;
+
     // Skip tables that don't have the expected structure
-    if (tableIdx === -1 || columnIdx === -1 || (isPiiIdx === -1 && sensitiveIdx === -1)) return;
+    if (tableIdx === -1 || columnIdx === -1 || (!implicitPii && isPiiIdx === -1 && sensitiveIdx === -1)) return;
 
     // Parse data rows
     rows.slice(1).each((_, row) => {
@@ -78,6 +83,18 @@ export function parseConfluenceTable(html: string): TableColumnOverride[] {
       const tableName = cells[tableIdx]?.toLowerCase();
       const columnName = cells[columnIdx]?.toLowerCase();
       if (!tableName || !columnName) return;
+
+      if (implicitPii) {
+        // Every row on the tracker is PII
+        overrides.push({
+          table: tableName,
+          column: columnName,
+          tier: 'high',
+          category: inferCategory(columnName),
+          label: `Confluence: ${tableName}.${columnName}`,
+        });
+        return;
+      }
 
       const isYes = (val: string | undefined) => !!val && /^y(es)?$/i.test(val.trim());
       const isPii = isPiiIdx !== -1 && isYes(cells[isPiiIdx]);

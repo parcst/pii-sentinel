@@ -63,7 +63,7 @@ Express on port 3001 with seven route groups:
 | `POST /api/teleport/cancel` | Cancel active SSE scan |
 | `POST /api/teleport/shutdown` | Abort scan + clean up all tunnels (sendBeacon target) |
 | `GET /api/settings/confluence` | Confluence config status (configured, source, masked fields) |
-| `PUT /api/settings/confluence` | Save Confluence config to file |
+| `PUT /api/settings/confluence` | Save Confluence config to file (accepts optional `trackerPageId`) |
 | `DELETE /api/settings/confluence` | Remove file-based Confluence config |
 | `POST /api/settings/confluence/test` | Test Confluence connection with provided credentials, return override count |
 | `POST /api/settings/confluence/validate` | Test the currently resolved config (env or file), return override count |
@@ -76,7 +76,7 @@ Express on port 3001 with seven route groups:
 | `DELETE /api/settings/jira` | Remove file-based Jira config |
 | `POST /api/settings/jira/test` | Test Jira connection with provided credentials (validates both project keys) |
 | `POST /api/settings/jira/validate` | Test the currently resolved Jira config (env or file) |
-| `POST /api/jira/create-ticket` | Create Bug tickets on both configured Jira boards, with server-side dedup |
+| `POST /api/jira/create-ticket` | Create Bug tickets on both configured Jira boards, with server-side dedup. Also appends row to Confluence tracker page if configured. Requires `lob` and `databaseName` params. |
 | `POST /api/jira/verify-ticket` | Check if tracked tickets still exist in Jira; if deleted, remove from tracking |
 | `GET /api/jira/tickets` | List all tracked Jira tickets for client-side dedup display |
 
@@ -93,6 +93,8 @@ Express on port 3001 with seven route groups:
 - **PII Overrides** (`services/pii-overrides.ts`) - Explicit table+column overrides for columns whose names are too generic to pattern-match globally (e.g. `code`, `short_key`, `entry_code`) but are confirmed PII on specific tables. Uses an O(1) Map lookup keyed by `tablename.columnname`. Override matches get `matchedOn: 'override'`. Also provides `mergeOverrides()` and `getOverridesFromMap()` for combining static and Confluence overrides into a single lookup.
 
 - **Confluence Overrides** (`services/confluence-overrides.ts`) - Dynamically fetches the Confluence PII reference page at scan time via REST API v1 (Basic auth). Parses the HTML table using `cheerio` to extract table+column PII/sensitive entries and converts them to `TableColumnOverride[]`. Falls back gracefully (empty array + warning log) on any failure so scans always complete. Confluence matches get `matchedOn: 'confluence'`.
+
+- **Confluence Tracker** (`services/confluence-tracker.ts`) - Appends a row to the Confluence PII tracker page when Jira tickets are created. `updateTrackerPage()` fetches the tracker page, parses the HTML table with cheerio, appends a new `<tr>` with LOB, Database Name, Table Name, Column Name, Added By, Date Added, EDDBA JIRA URL, and DL JIRA URL columns, then PUTs the page with incremented version. Fails gracefully — logs warning on error, never blocks Jira ticket response.
 
 - **Config Store** (`services/config-store.ts`) - Reads/writes `server/data/config.json` via `fs/promises`. Provides `loadConfig()`, `saveConfig()`, `clearConfluenceConfig()`, and `clearJiraConfig()`. Auto-creates the `data/` directory on first save.
 
@@ -141,12 +143,13 @@ Express on port 3001 with seven route groups:
 
 **Settings Components (`components/settings/`):**
 - `ConfluenceBanner` — Sidebar status: green "linked" indicator when valid, red warning when connection fails, setup prompt when unconfigured. Validates on page load.
-- `ConfluenceSetupModal` — Modal form for Confluence credentials (Page URL, Email, API Token). Test Connection button, Save/Cancel/Remove. Always editable regardless of config source. Shown as scan gate when unconfigured or when validation fails.
+- `ConfluenceSetupModal` — Modal form for Confluence credentials (Page URL, Email, API Token, optional Tracker Page URL). Test Connection button, Save/Cancel/Remove. Always editable regardless of config source. Shown as scan gate when unconfigured or when validation fails.
 - `JiraBanner` — Sidebar status: green "Jira linked (KEY1, KEY2)" when valid, red warning when connection fails, setup prompt when unconfigured. Validates on page load.
 - `JiraSetupModal` — Modal form for Jira credentials (Base URL, Email, API Token, Project Key 1, Project Key 2). Test Connection button validates both project keys, Save/Cancel/Remove.
 
 **Results Components (`components/results/`):**
 - `ExcludeScopePopover` — Inline absolute-positioned popover for choosing exclusion scope (global vs database-scoped). Anchored to Exclude button, dismisses on click-outside.
+- `LobSelectPopover` — Inline absolute-positioned popover for selecting Line of Business (LOB) before Jira ticket creation. Dropdown with options: POS, Punchh, Ordering, PARPAY, DataCentral, Delaget, Retail, Bridg, Task. Anchored to Jira button, dismisses on click-outside.
 - `ClearExclusionsDialog` — Confirmation modal for clearing all exclusions.
 - `SuggestExclusionsModal` — Modal for batch-excluding columns similar to already-excluded ones. Two match modes: "Similar pattern" (groups by shared PII match label) and "Exact column name only" (groups by identical column name). Supports global or database-scoped exclusion, group-level checkboxes (with indeterminate state), and select all/deselect all.
 - `DataSampleModal` — Modal that fetches and displays 10 sample rows (PK + PII column) from a live database. Shows loading spinner with SQL query preview, results table, NULL rendering, and error states. Only available in Live Database mode for tables with a primary key.
@@ -179,7 +182,7 @@ Users can manually exclude false-positive PII columns from scan results. Exclusi
 - `DatabaseResult`: Groups tables by location (cluster/connection/region/instance/database)
 - `TableResult`: Table with its PII columns and `primaryKey: string[]`
 - `PiiColumn`: Column with matches, highest tier, and primary category
-- `ConfluenceConfig`: `{ baseUrl, email, apiToken, pageId }` — config for Confluence API
+- `ConfluenceConfig`: `{ baseUrl, email, apiToken, pageId, trackerPageId? }` — config for Confluence API
 - `JiraConfig`: `{ baseUrl, email, apiToken, projectKeys: string[] }` — config for Jira API (1 or 2 project keys)
 - `PiiMatch.matchedOn`: `'name' | 'name+type' | 'override' | 'confluence'`
 - `ScanResponse.confluenceActive`: optional boolean flag indicating Confluence overrides were used
@@ -257,9 +260,12 @@ Optional Jira ticket creation for PII columns. When configured, each PII column 
 **Config resolution priority:** file config > env vars (all 5 set) > null (no Jira)
 
 **How it works:**
-- Clicking "Jira" on a PII column row calls `POST /api/jira/create-ticket`
+- Clicking "Jira" on a PII column row opens a LOB (Line of Business) selection popover
+- User selects LOB from dropdown (POS, Punchh, Ordering, PARPAY, DataCentral, Delaget, Retail, Bridg, Task), then confirms
+- Client calls `POST /api/jira/create-ticket` with `lob` and `databaseName` (derived from `connectionInfo.database` in live mode or last path segment in directory mode)
 - Server resolves Jira config, checks dedup in `server/data/jira-tickets.json`, auto-discovers required custom fields via `createmeta`, creates Bug tickets on each project via Jira REST API v3, and saves tracking entry
-- Client receives ticket keys/URLs, adds to local store, shows toast with clickable links
+- After ticket creation, if Confluence is configured with a `trackerPageId`, appends a row to the Confluence PII tracker page with LOB, Database Name, Table Name, Column Name, Added By, Date Added, EDDBA JIRA URL, and DL JIRA URL
+- Client receives ticket keys/URLs + `trackerUpdated` flag, adds to local store, shows toast with clickable links
 - Button is replaced with clickable ticket key links for already-ticketed columns (persists across refreshes)
 - When a user clicks a ticket link, a background verification checks if the ticket still exists in Jira; if deleted, the tracking entry is removed and the "Jira" button reappears
 - Confluence-matched and excluded columns do not show the Jira button

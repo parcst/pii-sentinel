@@ -128,6 +128,7 @@ export interface ConfluenceStatus {
   source?: 'env' | 'file';
   pageUrl?: string;
   email?: string;
+  trackerPageUrl?: string;
 }
 
 export interface ConfluenceTestResult {
@@ -163,4 +164,5 @@ export interface CreateTicketResponse {
   ticketKeys: string[];
   ticketUrls: string[];
   alreadyExists?: boolean;
+  trackerUpdated?: boolean;
 }

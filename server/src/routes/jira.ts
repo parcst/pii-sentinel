@@ -3,15 +3,17 @@ import { resolveJiraConfig } from '../services/jira-config.js';
 import { createJiraTickets, verifyJiraTicketExists } from '../services/jira-service.js';
 import { loadJiraTickets, saveJiraTickets, findExistingTicket } from '../services/jira-tickets-store.js';
 import { getOsUsername } from '../services/exclusion-store.js';
+import { resolveConfluenceConfig } from '../services/confluence-config.js';
+import { updateTrackerPage } from '../services/confluence-tracker.js';
 
 const router = Router();
 
 /** POST /api/jira/create-ticket — create tickets on both boards */
 router.post('/create-ticket', async (req: Request, res: Response) => {
   try {
-    const { table, column, dataType, tier, category, location } = req.body;
-    if (!table || !column || !dataType || !tier || !category || !location) {
-      res.status(400).json({ error: 'Missing required fields: table, column, dataType, tier, category, location' });
+    const { table, column, dataType, tier, category, location, lob, databaseName } = req.body;
+    if (!table || !column || !dataType || !tier || !category || !location || !lob || !databaseName) {
+      res.status(400).json({ error: 'Missing required fields: table, column, dataType, tier, category, location, lob, databaseName' });
       return;
     }
 
@@ -55,9 +57,50 @@ router.post('/create-ticket', async (req: Request, res: Response) => {
     });
     await saveJiraTickets(tickets);
 
+    // Attempt Confluence tracker update
+    let trackerUpdated = false;
+    try {
+      const confluenceResolved = await resolveConfluenceConfig();
+      if (confluenceResolved && confluenceResolved.config.trackerPageId) {
+        // Map ticket keys to EDDBA/DL keys + URLs
+        let eddbaJiraKey = 'N/A';
+        let eddbaJiraUrl = 'N/A';
+        let dlJiraKey = 'N/A';
+        let dlJiraUrl = 'N/A';
+        for (let i = 0; i < result.ticketKeys.length; i++) {
+          const projectKey = result.ticketKeys[i].split('-')[0];
+          if (projectKey === 'EDDBA') {
+            eddbaJiraKey = result.ticketKeys[i];
+            eddbaJiraUrl = result.ticketUrls[i];
+          } else if (projectKey === 'DL') {
+            dlJiraKey = result.ticketKeys[i];
+            dlJiraUrl = result.ticketUrls[i];
+          }
+        }
+
+        trackerUpdated = await updateTrackerPage(
+          confluenceResolved.config,
+          confluenceResolved.config.trackerPageId,
+          {
+            lob,
+            databaseName,
+            tableName: table,
+            columnName: column,
+            eddbaJiraKey,
+            eddbaJiraUrl,
+            dlJiraKey,
+            dlJiraUrl,
+          },
+        );
+      }
+    } catch (err: any) {
+      console.warn(`Confluence tracker update failed: ${err.message}`);
+    }
+
     res.json({
       ticketKeys: result.ticketKeys,
       ticketUrls: result.ticketUrls,
+      trackerUpdated,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

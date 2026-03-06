@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useScanStore } from '../../store/scan-store';
-import { saveJiraConfig, removeJiraConfig, testJiraConnection } from '../../api/client';
+import { saveJiraConfig, removeJiraConfig, testJiraConnection, validateJiraConnection } from '../../api/client';
 import type { JiraTestResult } from '../../api/types';
 
 interface Props {
@@ -56,7 +56,7 @@ export default function JiraSetupModal({ onSaved }: Props) {
 
   // API token is optional when Confluence is linked (server will reuse it)
   const tokenOptional = !!confluenceCreds;
-  const tokenReady = (tokenOptional && !overrideToken) || apiToken.trim();
+  const tokenReady = (tokenOptional && !overrideToken) || apiToken.trim() || isConfigured;
   const formValid = baseUrl.trim() && email.trim() && tokenReady && projectKey1.trim();
 
   const getConfig = () => ({
@@ -72,8 +72,15 @@ export default function JiraSetupModal({ onSaved }: Props) {
     setTestResult(null);
     setError(null);
     try {
-      const result = await testJiraConnection(getConfig());
-      setTestResult(result);
+      // If no token provided but already configured, test the stored config
+      const usingSharedToken = tokenOptional && !overrideToken;
+      if (!apiToken.trim() && !usingSharedToken && isConfigured) {
+        const result = await validateJiraConnection();
+        setTestResult(result);
+      } else {
+        const result = await testJiraConnection(getConfig());
+        setTestResult(result);
+      }
     } catch (err: any) {
       setTestResult({ success: false, error: err.message });
     } finally {

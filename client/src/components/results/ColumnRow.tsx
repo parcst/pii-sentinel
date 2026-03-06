@@ -4,6 +4,7 @@ import { createJiraTicket, verifyJiraTicket } from '../../api/client';
 import { useScanStore } from '../../store/scan-store';
 import ConfidenceBadge from './ConfidenceBadge';
 import ExcludeScopePopover from './ExcludeScopePopover';
+import LobSelectPopover from './LobSelectPopover';
 import DataSampleModal from './DataSampleModal';
 
 interface Props {
@@ -34,6 +35,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 export default function ColumnRow({ column, tableName, displayPath, dbLabel, scanMode, connectionInfo, primaryKey, isExcluded, excludedBy, onExclude, onInclude }: Props) {
   const onConfluence = column.matches.some(m => m.matchedOn === 'confluence');
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [lobPopoverOpen, setLobPopoverOpen] = useState(false);
   const [dataSampleOpen, setDataSampleOpen] = useState(false);
   const [creatingTicket, setCreatingTicket] = useState(false);
   const canSample = scanMode === 'live' && connectionInfo && primaryKey.length > 0;
@@ -47,8 +49,11 @@ export default function ColumnRow({ column, tableName, displayPath, dbLabel, sca
   const isTicketed = jiraTickets.some(t => t.table === tableName && t.column === column.columnName);
   const canJira = jiraValid === true && !onConfluence && !isExcluded;
 
-  const handleCreateTicket = async () => {
+  const handleCreateTicket = async (lob: string) => {
     setCreatingTicket(true);
+    const databaseName = scanMode === 'live' && connectionInfo
+      ? connectionInfo.database
+      : displayPath.split('/').pop() || displayPath;
     try {
       const result = await createJiraTicket({
         table: tableName,
@@ -57,6 +62,8 @@ export default function ColumnRow({ column, tableName, displayPath, dbLabel, sca
         tier: column.highestTier,
         category: column.primaryCategory,
         location: displayPath,
+        lob,
+        databaseName,
       });
       addJiraTicket({
         table: tableName,
@@ -140,7 +147,7 @@ export default function ColumnRow({ column, tableName, displayPath, dbLabel, sca
         })()}
         {canJira && !isTicketed && (
           <button
-            onClick={(e) => { e.stopPropagation(); handleCreateTicket(); }}
+            onClick={(e) => { e.stopPropagation(); setLobPopoverOpen(true); }}
             disabled={creatingTicket}
             className="px-2 py-0.5 text-[11px] text-orange-400 hover:text-orange-300 border border-orange-800 hover:border-orange-600 rounded transition-colors disabled:opacity-50"
           >
@@ -162,6 +169,15 @@ export default function ColumnRow({ column, tableName, displayPath, dbLabel, sca
           >
             Include
           </button>
+        )}
+        {lobPopoverOpen && (
+          <LobSelectPopover
+            onConfirm={(lob) => {
+              setLobPopoverOpen(false);
+              handleCreateTicket(lob);
+            }}
+            onCancel={() => setLobPopoverOpen(false)}
+          />
         )}
         {popoverOpen && (
           <ExcludeScopePopover

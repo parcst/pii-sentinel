@@ -156,7 +156,7 @@ export function parseConfluenceUrl(url: string): { baseUrl: string; pageId: stri
   }
 }
 
-export function saveConfluenceConfig(config: { baseUrl: string; email: string; apiToken: string; pageId: string }): Promise<{ saved: boolean }> {
+export function saveConfluenceConfig(config: { baseUrl: string; email: string; apiToken: string; pageId: string; trackerPageId?: string }): Promise<{ saved: boolean }> {
   return put('/api/settings/confluence', config);
 }
 
@@ -218,7 +218,7 @@ export function getJiraTickets(): Promise<{ tickets: JiraTicketEntry[] }> {
   return get('/api/jira/tickets');
 }
 
-export function createJiraTicket(params: { table: string; column: string; dataType: string; tier: string; category: string; location: string }): Promise<CreateTicketResponse> {
+export function createJiraTicket(params: { table: string; column: string; dataType: string; tier: string; category: string; location: string; lob: string; databaseName: string }): Promise<CreateTicketResponse> {
   return post('/api/jira/create-ticket', params);
 }
 
