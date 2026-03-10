@@ -30,11 +30,23 @@ function buildDbLabel(location: ScanResponse['databases'][0]['location']): strin
 
 type MatchMode = 'label' | 'exact';
 
+function exclusionKey(e: ExclusionEntry): string {
+  return `${e.table}|${e.column}|${e.scope}`;
+}
+
+function exclusionLabel(e: ExclusionEntry): string {
+  const scope = e.scope === 'global' ? 'global' : e.scope;
+  return `${e.table}.${e.column} (${scope})`;
+}
+
 function buildSuggestions(
   results: ScanResponse,
   exclusions: ExclusionEntry[],
   matchMode: MatchMode,
+  filterExclusion: ExclusionEntry | null,
 ): Map<string, SuggestionRow[]> {
+  const activeExclusions = filterExclusion ? [filterExclusion] : exclusions;
+
   // First pass: collect targets from excluded columns
   const targetLabels = new Set<string>();
   const targetNames = new Set<string>();
@@ -45,8 +57,8 @@ function buildSuggestions(
         // Skip confluence columns
         if (col.matches.some(m => m.matchedOn === 'confluence')) continue;
 
-        // Check if this column is excluded
-        const isExcluded = exclusions.some(
+        // Check if this column is excluded by the active exclusion(s)
+        const isExcluded = activeExclusions.some(
           e =>
             e.table === table.tableName &&
             e.column === col.columnName &&
@@ -177,10 +189,30 @@ export default function SuggestExclusionsModal({ results, exclusions, onClose }:
   const [scope, setScope] = useState<'global' | 'database'>('global');
   const [matchMode, setMatchMode] = useState<MatchMode>('label');
   const [applying, setApplying] = useState(false);
+  const [filterKey, setFilterKey] = useState<string>('all');
+
+  // Deduplicated list of exclusions that exist in the current results
+  const availableExclusions = useMemo(() => {
+    const seen = new Set<string>();
+    const result: ExclusionEntry[] = [];
+    for (const e of exclusions) {
+      const k = exclusionKey(e);
+      if (!seen.has(k)) {
+        seen.add(k);
+        result.push(e);
+      }
+    }
+    return result.sort((a, b) => exclusionLabel(a).localeCompare(exclusionLabel(b)));
+  }, [exclusions]);
+
+  const filterExclusion = useMemo(() => {
+    if (filterKey === 'all') return null;
+    return availableExclusions.find(e => exclusionKey(e) === filterKey) ?? null;
+  }, [filterKey, availableExclusions]);
 
   const suggestions = useMemo(
-    () => buildSuggestions(results, exclusions, matchMode),
-    [results, exclusions, matchMode],
+    () => buildSuggestions(results, exclusions, matchMode, filterExclusion),
+    [results, exclusions, matchMode, filterExclusion],
   );
 
   // Collect all row keys for select all / deselect all
@@ -260,6 +292,23 @@ export default function SuggestExclusionsModal({ results, exclusions, onClose }:
 
         {/* Body */}
         <div className="px-5 py-4 overflow-y-auto flex-1">
+          {/* Exclusion filter dropdown */}
+          <div className="flex items-center gap-3 mb-3 text-sm">
+            <span className="text-gray-400">Based on:</span>
+            <select
+              value={filterKey}
+              onChange={e => setFilterKey(e.target.value)}
+              className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
+            >
+              <option value="all">All exclusions ({availableExclusions.length})</option>
+              {availableExclusions.map(e => (
+                <option key={exclusionKey(e)} value={exclusionKey(e)}>
+                  {exclusionLabel(e)}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Match mode toggle */}
           <div className="flex items-center gap-4 mb-3 text-sm">
             <span className="text-gray-400">Match:</span>
